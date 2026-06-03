@@ -50,3 +50,29 @@ def test_chat_completions_non_streaming(test_client):
     assert response.status_code == 200
     assert response.headers.get("x-router-tier") == "local"
     assert response.json()["choices"][0]["message"]["content"] == "Hi there"
+
+
+async def fake_stream():
+    chunks = [
+        b'data: {"choices":[{"delta":{"content":"Hello"}}]}\n\n',
+        b'data: {"choices":[{"delta":{"content":" world"}}]}\n\n',
+        b"data: [DONE]\n\n",
+    ]
+    for chunk in chunks:
+        yield chunk
+
+
+def test_chat_completions_streaming(test_client):
+    with patch("ai_router.main.route_request", new_callable=AsyncMock, return_value=("heavy", fake_stream())):
+        response = test_client.post(
+            "/v1/chat/completions",
+            json={
+                "model": "auto",
+                "messages": [{"role": "user", "content": "Write an essay"}],
+                "stream": True,
+            },
+        )
+    assert response.status_code == 200
+    assert response.headers.get("x-router-tier") == "heavy"
+    assert "Hello" in response.text
+    assert "[DONE]" in response.text
