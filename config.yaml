@@ -1,0 +1,43 @@
+server:
+  port: 8080
+  host: 0.0.0.0
+
+classifier:
+  endpoint: http://localhost:11434
+  model: qwen3:4b
+  system_prompt: |
+    You are a prompt router. Given a user message and metadata,
+    classify it into one of the available tiers.
+    Respond with ONLY valid JSON: {"tier": "<tier_name>", "reason": "<brief reason>"}
+  metadata:
+    - token_count
+    - has_code
+    - conversation_turns
+    - last_message_length
+  timeout_ms: 5000
+
+tiers:
+  - name: local
+    description: Simple questions, formatting, short factual answers
+    models:
+      - name: qwen3:4b
+        endpoint: http://localhost:11434
+        type: ollama
+  - name: medium
+    description: Moderate reasoning, summarization, standard coding tasks
+    models:
+      - name: claude-sonnet
+        endpoint: https://api.anthropic.com
+        type: anthropic
+        api_key_env: ANTHROPIC_API_KEY
+  - name: heavy
+    description: Complex analysis, large codebases, multi-step reasoning
+    models:
+      - name: claude-opus
+        endpoint: https://api.anthropic.com
+        type: anthropic
+        api_key_env: ANTHROPIC_API_KEY
+
+routing:
+  default_tier: medium
+  passthrough_model: true
