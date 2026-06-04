@@ -79,3 +79,16 @@ Add as a custom provider in `models.json` pointing at `http://localhost:8080`.
 pip install -e ".[dev]"
 pytest -v
 ```
+
+## Next Steps
+
+- [ ] End-to-end test with real ollama (pull `qwen3:4b`, start the server, send a request)
+- [ ] Tune the classifier system prompt - iterate on what makes it reliably distinguish tiers
+- [ ] Test with Claude Code as a client (`base_url` config)
+- [ ] Test with Pi as a client (`models.json` provider config)
+- [ ] Containerize (Dockerfile) for easy deployment
+- [ ] Add request logging (which tier was selected, latency, model used)
+- [ ] Capability tags on models (e.g. "coding", "vision") for within-tier selection
+- [ ] Configurable rules engine as a fast-path pre-classifier (regex, token thresholds)
+- [ ] Explore Gemini Flash as an additional model tier (fast, cheap, Google-hosted)
+- [ ] Local-first strategy: default to Pi/local ollama, fall back to cloud only when needed - new approach to reducing cloud spend
