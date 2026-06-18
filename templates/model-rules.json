@@ -1,0 +1,16 @@
+{
+  "rules": [
+    { "if": { "tokenCount": { "lt": 300 } }, "then": "local" },
+    { "if": { "keywords": ["ls", "grep", "cat", "echo", "pwd", "which"] }, "then": "local" },
+    { "if": { "keywords": ["analyze", "refactor", "architecture", "design", "review all"] }, "then": "heavy" },
+    { "if": { "tokenCount": { "gt": 8000 } }, "then": "heavy" }
+  ],
+  "classifierUrl": "http://localhost:8080",
+  "classifierTimeoutMs": 2000,
+  "defaultModel": "claude-sonnet-4-20250514",
+  "models": {
+    "local": "qwen3:4b",
+    "medium": "claude-sonnet-4-20250514",
+    "heavy": "claude-opus-4-8-20251101"
+  }
+}
