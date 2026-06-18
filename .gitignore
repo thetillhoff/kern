@@ -4,3 +4,4 @@ __pycache__/
 dist/
 .env
 *.pyc
+node_modules/
