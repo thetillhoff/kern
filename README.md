@@ -1,94 +1,79 @@
-# AI Router
+# ai-router
 
-A local AI prompt router that classifies requests by complexity and routes them to the appropriate model tier. Drop-in replacement for any OpenAI-compatible endpoint.
+Two complementary tools for intelligent AI model routing:
 
-## How It Works
+1. **Python Router** (`src/ai_router/`) - OpenAI-compatible HTTP proxy that classifies requests and forwards to the right model tier (local Ollama / cloud Anthropic).
+2. **Pi Extensions** (`pi-extensions/`) - TypeScript extensions for the [Pi coding agent](https://github.com/earendil-works/pi) that add bash safety, model routing, URL fetching, context logging, and MCP integration.
 
-```mermaid
-flowchart TD
-    subgraph Clients
-        CC[Claude Code]
-        Pi[Pi]
-    end
+## How They Fit Together
 
-    subgraph Router[AI Router]
-        ME[1. Metadata Extractor\ntoken count, code presence, conversation length]
-        CL[2. Classifier\nlocal ollama, returns tier]
-        MS[3. Model Selector\nmaps tier to backend]
-    end
-
-    subgraph Backends
-        Local[ollama local\nQwen3 4B]
-        Medium[Cloud Medium\ne.g. Sonnet]
-        Heavy[Cloud Heavy\ne.g. Opus]
-    end
-
-    CC -->|OpenAI-compatible request| ME
-    Pi -->|OpenAI-compatible request| ME
-    ME --> CL
-    CL --> MS
-    MS -->|4. Forward & stream response| Local
-    MS -->|4. Forward & stream response| Medium
-    MS -->|4. Forward & stream response| Heavy
+```text
+Pi (coding agent)
+  model-router extension
+    rule-based fast path (~0ms)
+    → Python router at :8080 (Ollama classifier, ~300-800ms)
+        → local tier: Ollama qwen3:4b
+        → medium tier: claude-sonnet
+        → heavy tier: claude-opus
 ```
 
 ## Quick Start
 
+### Python Router
+
 ```bash
-# Install
 pip install -e ".[dev]"
-
-# Configure (edit config.yaml with your models)
-cp config.yaml config.yaml
-
-# Run
+cp config.yaml config.local.yaml  # edit with your models
 ai-router
 ```
 
-## Configuration
+Router runs at `http://localhost:8080`. See `config.yaml` for tier/model configuration.
 
-Edit `config.yaml` to define your tiers and models. See the default config for the full schema.
+### Pi Extensions
 
-## Usage
-
-Point any OpenAI-compatible client at `http://localhost:8080`:
+Requirements: [Pi](https://github.com/earendil-works/pi) installed, [Bun](https://bun.sh) for tests.
 
 ```bash
-# Auto-route (classifier picks the tier)
-curl http://localhost:8080/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{"model": "auto", "messages": [{"role": "user", "content": "Hi"}]}'
-
-# Passthrough (skip classifier, use specific model)
-curl http://localhost:8080/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{"model": "claude-opus", "messages": [{"role": "user", "content": "Complex task..."}]}'
+./install.sh   # symlinks extensions, copies config templates to ~/.pi/
 ```
 
-### Claude Code
+Edit the created config files:
 
-Set `base_url: http://localhost:8080` in your Claude Code config.
+- `~/.pi/agent/settings.json` - default model, compaction, bash safety rules
+- `~/.pi/model-rules.json` - keyword/token routing rules
+- `~/.pi/PI.md` - global instructions injected into every session (like `CLAUDE.md`)
+- `~/.pi/mcp.json` - MCP server list for auto-discovery
 
-### Pi
+Start Pi and the extensions load automatically:
 
-Add as a custom provider in `models.json` pointing at `http://localhost:8080`.
+```bash
+pi
+```
+
+### Running Extension Tests
+
+```bash
+cd pi-extensions && bun test
+```
+
+## Extensions
+
+| Extension | What it does |
+| --- | --- |
+| `safe-bash` | Blocks dangerous commands; prompts for unknown ones; pre-approves allowlist patterns |
+| `claude-compat` | Loads `~/.pi/PI.md` and `.pi/PI.md` into the system prompt each turn |
+| `model-router` | Routes to local/medium/heavy tier via rules then Python router then default |
+| `fetch-url` | Adds `fetch_url` tool for reading HTTPS URLs |
+| `context-manager` | Logs context compaction events to `~/.pi/compaction.jsonl` |
+| `mcp-integration` | Auto-discovers tools from MCP servers in `~/.pi/mcp.json` |
 
 ## Development
 
 ```bash
+# Python router tests
 pip install -e ".[dev]"
 pytest -v
+
+# Extension tests
+cd pi-extensions && bun test
 ```
-
-## Next Steps
-
-- [ ] End-to-end test with real ollama (pull `qwen3:4b`, start the server, send a request)
-- [ ] Tune the classifier system prompt - iterate on what makes it reliably distinguish tiers
-- [ ] Test with Claude Code as a client (`base_url` config)
-- [ ] Test with Pi as a client (`models.json` provider config)
-- [ ] Containerize (Dockerfile) for easy deployment
-- [ ] Add request logging (which tier was selected, latency, model used)
-- [ ] Capability tags on models (e.g. "coding", "vision") for within-tier selection
-- [ ] Configurable rules engine as a fast-path pre-classifier (regex, token thresholds)
-- [ ] Explore Gemini Flash as an additional model tier (fast, cheap, Google-hosted)
-- [ ] Local-first strategy: default to Pi/local ollama, fall back to cloud only when needed - new approach to reducing cloud spend
