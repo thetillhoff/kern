@@ -9,5 +9,7 @@ export function matchesPattern(command: string, pattern: string): boolean {
 }
 
 export function matchesAny(command: string, patterns: string[]): boolean {
-  return patterns.some((p) => matchesPattern(command, p));
+  // Check each chained segment so `rm -rf / && ls` doesn't bypass whole-string patterns
+  const segments = command.split(/&&|;|\|/).map((s) => s.trim()).filter(Boolean);
+  return segments.some((seg) => patterns.some((p) => matchesPattern(seg, p)));
 }

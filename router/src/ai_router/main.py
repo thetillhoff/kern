@@ -45,7 +45,6 @@ async def list_models():
 async def chat_completions(request: Request):
     config = get_config()
     body = await request.json()
-    stream = body.get("stream", False)
 
     tier_name, response = await route_request(config, body)
 
@@ -56,8 +55,15 @@ async def chat_completions(request: Request):
             headers={"X-Router-Tier": tier_name},
         )
     else:
+        content_type = response.headers.get("content-type", "")
+        if "application/json" in content_type:
+            return JSONResponse(
+                content=response.json(),
+                status_code=response.status_code,
+                headers={"X-Router-Tier": tier_name},
+            )
         return JSONResponse(
-            content=response.json(),
+            content={"error": response.text},
             status_code=response.status_code,
             headers={"X-Router-Tier": tier_name},
         )

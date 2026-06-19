@@ -10,7 +10,7 @@ mkdir -p "$PI_EXT_DIR"
 mkdir -p "$PI_AGENT_DIR"
 
 echo "==> Linking extensions..."
-for ext_dir in "$REPO_DIR/pi-extensions"/*/; do
+for ext_dir in "$REPO_DIR/extensions"/*/; do
   name=$(basename "$ext_dir")
   target="$PI_EXT_DIR/$name"
   # Remove existing symlink; leave real directories alone

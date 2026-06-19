@@ -26,7 +26,15 @@ class OllamaBackend:
                 f"{self.endpoint}/v1/chat/completions",
                 json={**body, "stream": True},
             )
-            response = await client.send(req, stream=True)
+            try:
+                response = await client.send(req, stream=True)
+            except Exception:
+                await client.aclose()
+                raise
+            if response.status_code >= 400:
+                await response.aread()
+                await client.aclose()
+                return response
             return self._stream_with_cleanup(response, client)
         else:
             response = await client.post(

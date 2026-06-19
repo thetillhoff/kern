@@ -42,7 +42,15 @@ class AnthropicBackend:
                 json={**body, "stream": True},
                 headers=headers,
             )
-            response = await client.send(req, stream=True)
+            try:
+                response = await client.send(req, stream=True)
+            except Exception:
+                await client.aclose()
+                raise
+            if response.status_code >= 400:
+                await response.aread()
+                await client.aclose()
+                return response
             return self._stream_with_cleanup(response, client)
         else:
             response = await client.post(

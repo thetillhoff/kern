@@ -1,60 +1,32 @@
-# ai-router
+# kern
 
-Two complementary tools for intelligent AI model routing:
+A Pi coding agent harness with intelligent model routing, bash safety, URL fetching, context management, and MCP integration.
 
-1. **Python Router** (`src/ai_router/`) - OpenAI-compatible HTTP proxy that classifies requests and forwards to the right model tier (local Ollama / cloud Anthropic).
-2. **Pi Extensions** (`pi-extensions/`) - TypeScript extensions for the [Pi coding agent](https://github.com/earendil-works/pi) that add bash safety, model routing, URL fetching, context logging, and MCP integration.
+Built on [Pi](https://github.com/earendil-works/pi). Eventually: a full terminal-native AI coding environment.
 
-## How They Fit Together
+## Structure
 
 ```text
-Pi (coding agent)
-  model-router extension
-    rule-based fast path (~0ms)
-    → Python router at :8080 (Ollama classifier, ~300-800ms)
-        → local tier: Ollama qwen3:4b
-        → medium tier: claude-sonnet
-        → heavy tier: claude-opus
+kern/
+├── extensions/      # Pi extensions (TypeScript)
+├── router/          # OpenAI-compatible routing proxy (Python)
+├── templates/       # Config templates copied to ~/.pi/ on install
+└── install.sh       # Symlinks extensions, copies templates
 ```
 
 ## Quick Start
 
-### Python Router
-
 ```bash
-pip install -e ".[dev]"
-cp config.yaml config.local.yaml  # edit with your models
-ai-router
-```
-
-Router runs at `http://localhost:8080`. See `config.yaml` for tier/model configuration.
-
-### Pi Extensions
-
-Requirements: [Pi](https://github.com/earendil-works/pi) installed, [Bun](https://bun.sh) for tests.
-
-```bash
-./install.sh   # symlinks extensions, copies config templates to ~/.pi/
+./install.sh
+pi
 ```
 
 Edit the created config files:
 
-- `~/.pi/agent/settings.json` - default model, compaction, bash safety rules
+- `~/.pi/agent/settings.json` - default model, bash safety rules
 - `~/.pi/model-rules.json` - keyword/token routing rules
-- `~/.pi/PI.md` - global instructions injected into every session (like `CLAUDE.md`)
+- `~/.pi/PI.md` - global instructions injected every session (like `CLAUDE.md`)
 - `~/.pi/mcp.json` - MCP server list for auto-discovery
-
-Start Pi and the extensions load automatically:
-
-```bash
-pi
-```
-
-### Running Extension Tests
-
-```bash
-cd pi-extensions && bun test
-```
 
 ## Extensions
 
@@ -67,13 +39,23 @@ cd pi-extensions && bun test
 | `context-manager` | Logs context compaction events to `~/.pi/compaction.jsonl` |
 | `mcp-integration` | Auto-discovers tools from MCP servers in `~/.pi/mcp.json` |
 
+## Router (optional)
+
+The Python router is an OpenAI-compatible HTTP proxy that classifies requests and forwards to the right model tier. The `model-router` extension calls it as a tier-2 classifier.
+
+```bash
+cd router
+docker build -t kern-router .
+cp config.yaml config.local.yaml  # edit with your models
+docker run --rm -p 8080:8080 -v "$PWD/config.local.yaml:/app/config.yaml" kern-router
+```
+
 ## Development
 
 ```bash
-# Python router tests
-pip install -e ".[dev]"
-pytest -v
-
 # Extension tests
-cd pi-extensions && bun test
+cd extensions && bun test
+
+# Router tests (Docker)
+cd router && docker run --rm -v "$PWD:/app" -w /app kern-router pytest -v
 ```

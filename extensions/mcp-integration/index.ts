@@ -25,10 +25,21 @@ export default async function (pi: ExtensionAPI) {
   });
 }
 
+function mcpParamType(type: string, description?: string) {
+  switch (type) {
+    case "boolean": return Type.Boolean({ description });
+    case "integer": return Type.Integer({ description });
+    case "number": return Type.Number({ description });
+    case "object": return Type.Object({}, { description });
+    case "array": return Type.Array(Type.Unknown(), { description });
+    default: return Type.String({ description });
+  }
+}
+
 function registerMcpTool(pi: ExtensionAPI, serverName: string, serverUrl: string, tool: McpTool): void {
   const props: Record<string, ReturnType<typeof Type.String>> = {};
   for (const param of tool.parameters ?? []) {
-    props[param.name] = Type.String({ description: param.description });
+    props[param.name] = mcpParamType(param.type, param.description) as ReturnType<typeof Type.String>;
   }
 
   pi.registerTool({

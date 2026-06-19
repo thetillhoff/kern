@@ -2,6 +2,7 @@ import logging
 from typing import AsyncIterator
 
 import httpx
+from fastapi import HTTPException
 
 from ai_router.backends import get_backend
 from ai_router.classifier import classify_request
@@ -37,6 +38,7 @@ async def route_request(
             backend = get_backend(model_config)
             response = await backend.forward(request_body, stream=stream)
             return tier_name, response
+        raise HTTPException(status_code=404, detail={"error": f"unknown model: {model}"})
 
     # Classification path
     metadata = extract_metadata(messages)
@@ -58,7 +60,7 @@ async def route_request(
         tier_name = config.routing.default_tier
         logger.warning(f"Classifier failed, falling back to default tier: {tier_name}")
 
-    tier = next((t for t in config.tiers if t.name == tier_name), config.tiers[0])
+    tier = next(t for t in config.tiers if t.name == tier_name)
     model_config = tier.models[0]
     backend = get_backend(model_config)
     response = await backend.forward(request_body, stream=stream)

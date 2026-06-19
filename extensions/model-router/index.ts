@@ -41,7 +41,11 @@ export default function (pi: ExtensionAPI) {
 
     async function setModelByName(modelName: string): Promise<void> {
       const model = ctx.modelRegistry.find(undefined as unknown as string, modelName);
-      if (model) await pi.setModel(model);
+      if (model) {
+        await pi.setModel(model);
+      } else {
+        console.warn(`[model-router] model not found in registry: ${modelName}`);
+      }
     }
 
     // Tier 1: rule-based fast path

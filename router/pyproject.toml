@@ -1,5 +1,5 @@
 [project]
-name = "ai-router"
+name = "kern-router"
 version = "0.1.0"
 description = "Local AI prompt router with OpenAI-compatible API"
 requires-python = ">=3.11"

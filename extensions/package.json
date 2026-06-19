@@ -1,5 +1,5 @@
 {
-  "name": "pi-extensions",
+  "name": "kern-extensions",
   "type": "module",
   "scripts": {
     "test": "bun test"

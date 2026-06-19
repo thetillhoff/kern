@@ -7,7 +7,7 @@ These are the immediate next things to do to make the system actually usable.
 ### 1. End-to-end smoke test
 
 - Pull `qwen3:4b` locally (`ollama pull qwen3:4b`)
-- Start Python router: `ai-router`
+- Start Python router: `cd router && docker run --rm -p 8080:8080 -v "$PWD/config.local.yaml:/app/config.yaml" kern-router`
 - Run `./install.sh`
 - Start Pi and verify each extension loads (check for error messages in Pi startup)
 - Send a short message → confirm `model-decisions.jsonl` shows `reason: "rule"`, tier `local`
@@ -24,10 +24,21 @@ The Pi extension API for mutating the system prompt in `before_agent_start` is c
 `unknown` in `index.ts`. Verify this actually works once Pi is running - the event shape
 may differ. Consult Pi source or examples if it silently no-ops.
 
-### 4. Fix `modelRegistry.find()` call in `model-router`
+### 4. Add Dockerfile for Python router
+
+README now references `docker build -t kern-router .` but no `Dockerfile` exists in `router/`. Add one
+before the smoke test is runnable.
+
+### 5. Fix `modelRegistry.find()` call in `model-router`
 
 `ctx.modelRegistry.find(undefined, modelName)` is a workaround - the real API may require
 provider + model. Verify against Pi source and fix the signature.
+
+---
+
+## Code Review Findings
+
+All 15 issues resolved.
 
 ---
 
@@ -60,13 +71,10 @@ Things worth doing but not blocking immediate use.
   Output as JSONL for easy parsing.
 - **Gemini Flash tier** - Add a `medium-fast` tier using Gemini Flash as a cheap, fast
   option between local and Sonnet.
-- **Dockerfile** - Containerize the Python router for easy deployment without a local Python
-  env.
 - **Classifier prompt tuning** - The current system prompt is minimal. Tune with real examples
   of local/medium/heavy requests.
 
 ### Infrastructure
 
 - **`install.sh` uninstall** - Add a `--uninstall` flag that removes symlinks.
-- **`.gitignore`** - Add `pi-extensions/node_modules/` if not already ignored.
 - **CI** - Run `bun test` and `pytest` on push. GitHub Actions workflow.
