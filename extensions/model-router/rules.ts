@@ -6,8 +6,7 @@ export interface RoutingRule {
   then: string;
 }
 
-export function estimateTokens(messages: Array<{ content?: string }>): number {
-  const text = messages.map((m) => m.content ?? "").join(" ");
+export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 

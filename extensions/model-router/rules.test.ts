@@ -33,10 +33,10 @@ test("first matching rule wins (keyword before token gt)", () => {
 });
 
 test("estimateTokens: 4 chars per token", () => {
-  expect(estimateTokens([{ content: "a".repeat(400) }])).toBe(100);
+  expect(estimateTokens("a".repeat(400))).toBe(100);
 });
 
-test("estimateTokens: joins messages", () => {
+test("estimateTokens: short string", () => {
   // "aaaa aaaa" = 9 chars → ceil(9/4) = 3
-  expect(estimateTokens([{ content: "aaaa" }, { content: "aaaa" }])).toBe(3);
+  expect(estimateTokens("aaaa aaaa")).toBe(3);
 });

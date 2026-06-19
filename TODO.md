@@ -6,30 +6,22 @@ These are the immediate next things to do to make the system actually usable.
 
 ### 1. End-to-end smoke test
 
-- Pull `qwen3:4b` locally (`ollama pull qwen3:4b`)
-- Start Python router: `cd router && docker run --rm -p 8080:8080 -v "$PWD/config.local.yaml:/app/config.yaml" kern-router`
 - Run `./install.sh`
 - Start Pi and verify each extension loads (check for error messages in Pi startup)
-- Send a short message → confirm `model-decisions.jsonl` shows `reason: "rule"`, tier `local`
-- Send a complex message → confirm classifier hit and correct tier selected
+- Send a short message (< 300 tokens, no complex keywords) → confirm `model-decisions.jsonl` shows `reason: "rule"`, tier `light`, model `claude-haiku-4-5`
+- Send a large or architecture-focused message → confirm tier `heavy`, model `claude-opus-4-8`
+- Default messages (no rule match) → confirm tier falls back to `claude-sonnet-4-6`
 
-### 2. Tune classifier system prompt
+Optional: to test the Python router classifier, add `classifierUrl` to `~/.pi/model-rules.json`
+and start the router (`cd router && uvicorn app:app`).
 
-The classifier in `config.yaml` is basic. After the smoke test, iterate on what reliably
-distinguishes `local` / `medium` / `heavy` with real Pi conversations.
-
-### 3. Fix `before_agent_start` system prompt injection in `claude-compat`
+### 2. Fix `before_agent_start` system prompt injection in `claude-compat`
 
 The Pi extension API for mutating the system prompt in `before_agent_start` is cast via
 `unknown` in `index.ts`. Verify this actually works once Pi is running - the event shape
 may differ. Consult Pi source or examples if it silently no-ops.
 
-### 4. Add Dockerfile for Python router
-
-README now references `docker build -t kern-router .` but no `Dockerfile` exists in `router/`. Add one
-before the smoke test is runnable.
-
-### 5. Fix `modelRegistry.find()` call in `model-router`
+### 3. Fix `modelRegistry.find()` call in `model-router`
 
 `ctx.modelRegistry.find(undefined, modelName)` is a workaround - the real API may require
 provider + model. Verify against Pi source and fix the signature.

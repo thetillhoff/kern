@@ -31,16 +31,14 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("before_agent_start", async (event, ctx) => {
     const config = loadConfig(rulesPath);
-    const rawEvent = event as unknown as { messages?: Array<{ role: string; content?: string }> };
-    const messages = rawEvent.messages ?? [];
-    const lastMessage = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
-    const tokenCount = estimateTokens(messages);
+    const lastMessage = event.prompt;
+    const tokenCount = estimateTokens(event.prompt);
     const start = Date.now();
 
-    const session = ctx.sessionManager.getBranch() ?? "unknown";
+    const session = ctx.sessionManager.getSessionId();
 
     async function setModelByName(modelName: string): Promise<void> {
-      const model = ctx.modelRegistry.find(undefined as unknown as string, modelName);
+      const model = ctx.modelRegistry.getAll().find((m) => m.id === modelName);
       if (model) {
         await pi.setModel(model);
       } else {

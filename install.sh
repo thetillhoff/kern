@@ -2,24 +2,21 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
-PI_EXT_DIR="$HOME/.pi/agent/extensions"
 PI_DIR="$HOME/.pi"
 PI_AGENT_DIR="$HOME/.pi/agent"
 
-mkdir -p "$PI_EXT_DIR"
 mkdir -p "$PI_AGENT_DIR"
 
 echo "==> Linking extensions..."
-for ext_dir in "$REPO_DIR/extensions"/*/; do
-  name=$(basename "$ext_dir")
-  target="$PI_EXT_DIR/$name"
-  # Remove existing symlink; leave real directories alone
-  if [ -L "$target" ]; then
-    rm "$target"
-  fi
-  ln -s "$ext_dir" "$target"
-  echo "  Linked: $name -> $target"
-done
+target="$PI_AGENT_DIR/extensions"
+if [ -L "$target" ]; then
+  rm "$target"
+elif [ -d "$target" ]; then
+  echo "  ERROR: $target is a real directory, not a symlink. Remove it manually first."
+  exit 1
+fi
+ln -s "$REPO_DIR/extensions" "$target"
+echo "  Linked: extensions -> $target"
 
 echo "==> Copying templates..."
 for template in "$REPO_DIR/templates"/*; do
