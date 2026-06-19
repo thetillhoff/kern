@@ -3,12 +3,13 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { applyRules, estimateTokens, type RoutingRule } from "./rules.ts";
-import { callClassifier } from "./classifier.ts";
+import { callOllama } from "./classifier.ts";
 import { appendDecision } from "./logger.ts";
 
 interface RouterConfig {
   rules: RoutingRule[];
-  classifierUrl: string | null;
+  ollamaUrl: string | null;
+  ollamaModel: string | null;
   classifierTimeoutMs: number;
   defaultModel: string | null;
   models: Record<string, string>;
@@ -16,12 +17,12 @@ interface RouterConfig {
 
 function loadConfig(rulesPath: string): RouterConfig {
   if (!existsSync(rulesPath)) {
-    return { rules: [], classifierUrl: null, classifierTimeoutMs: 2000, defaultModel: null, models: {} };
+    return { rules: [], ollamaUrl: null, ollamaModel: null, classifierTimeoutMs: 2000, defaultModel: null, models: {} };
   }
   try {
     return JSON.parse(readFileSync(rulesPath, "utf-8")) as RouterConfig;
   } catch {
-    return { rules: [], classifierUrl: null, classifierTimeoutMs: 2000, defaultModel: null, models: {} };
+    return { rules: [], ollamaUrl: null, ollamaModel: null, classifierTimeoutMs: 2000, defaultModel: null, models: {} };
   }
 }
 
@@ -63,9 +64,9 @@ export default function (pi: ExtensionAPI) {
       return;
     }
 
-    // Tier 2: classifier (Python router)
-    if (config.classifierUrl) {
-      const tier = await callClassifier(config.classifierUrl, messages, config.classifierTimeoutMs ?? 2000);
+    // Tier 2: Ollama classifier
+    if (config.ollamaUrl && config.ollamaModel) {
+      const tier = await callOllama(config.ollamaUrl, config.ollamaModel, lastMessage, config.classifierTimeoutMs ?? 2000);
       if (tier) {
         const modelName = config.models?.[tier] ?? config.defaultModel;
         if (modelName) await setModelByName(modelName);
@@ -74,7 +75,7 @@ export default function (pi: ExtensionAPI) {
           session,
           tier,
           model: modelName ?? "unknown",
-          reason: "classifier",
+          reason: "ollama",
           latencyMs: Date.now() - start,
         });
         return;

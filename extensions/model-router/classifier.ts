@@ -1,24 +1,32 @@
-/**
- * POST to the Python router's /v1/chat/completions with model:"auto".
- * The router classifies and returns X-Router-Tier header.
- * Returns null on timeout, network error, or missing header.
- */
-export async function callClassifier(
+const SYSTEM_PROMPT = `Classify the user message into exactly one routing tier.
+Reply with a single word only — no punctuation, no explanation.
+
+Tiers:
+- light: shell commands, quick lookups
+- medium: coding, debugging, explanations, general questions
+- heavy: architecture, design, research, deep analysis`;
+
+const VALID_TIERS = new Set(["light", "medium", "heavy"]);
+
+export async function callOllama(
   baseUrl: string,
-  messages: Array<{ role: string; content?: string }>,
+  model: string,
+  prompt: string,
   timeoutMs: number
 ): Promise<string | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(`${baseUrl}/v1/chat/completions`, {
+    const res = await fetch(`${baseUrl}/api/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "auto", messages }),
+      body: JSON.stringify({ model, system: SYSTEM_PROMPT, prompt, stream: false }),
       signal: controller.signal,
     });
     clearTimeout(timer);
-    return response.headers.get("x-router-tier") ?? null;
+    if (!res.ok) return null;
+    const data = await res.json() as { response?: string };
+    return data.response?.toLowerCase().split(/\s+/).find((w) => VALID_TIERS.has(w)) ?? null;
   } catch {
     clearTimeout(timer);
     return null;

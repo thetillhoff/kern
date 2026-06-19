@@ -4,6 +4,8 @@
     { "if": { "keywords": ["architecture", "design system", "strategic", "review all", "deep dive", "compare options", "tradeoffs", "research", "think"] }, "then": "heavy" },
     { "if": { "tokenCount": { "gt": 8000 } }, "then": "heavy" }
   ],
+  "ollamaUrl": null,
+  "ollamaModel": "qwen3:4b",
   "defaultModel": "claude-sonnet-4-6",
   "models": {
     "light": "claude-haiku-4-5",

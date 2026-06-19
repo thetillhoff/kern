@@ -1,39 +1,43 @@
 import { test, expect, mock, afterEach } from "bun:test";
-import { callClassifier } from "./classifier.ts";
+import { callOllama } from "./classifier.ts";
 
 const originalFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = originalFetch; });
 
-test("returns tier from X-Router-Tier header", async () => {
-  globalThis.fetch = mock(() =>
-    Promise.resolve(
-      new Response(JSON.stringify({}), {
-        headers: { "x-router-tier": "heavy" },
-      })
-    )
+function ollamaResponse(text: string, ok = true) {
+  return Promise.resolve(
+    new Response(JSON.stringify({ response: text }), { status: ok ? 200 : 500 })
   );
-  const tier = await callClassifier("http://localhost:8080", [{ role: "user", content: "hi" }], 2000);
-  expect(tier).toBe("heavy");
+}
+
+test("returns tier from ollama response", async () => {
+  globalThis.fetch = mock(() => ollamaResponse("heavy"));
+  expect(await callOllama("http://localhost:11434", "qwen3:4b", "design the architecture", 2000)).toBe("heavy");
 });
 
-test("returns null when header missing", async () => {
-  globalThis.fetch = mock(() =>
-    Promise.resolve(new Response(JSON.stringify({})))
-  );
-  const tier = await callClassifier("http://localhost:8080", [{ role: "user", content: "hi" }], 2000);
-  expect(tier).toBeNull();
+test("picks first valid word from verbose response", async () => {
+  globalThis.fetch = mock(() => ollamaResponse("I think this is medium complexity."));
+  expect(await callOllama("http://localhost:11434", "qwen3:4b", "write a function", 2000)).toBe("medium");
+});
+
+test("returns null for unrecognized response", async () => {
+  globalThis.fetch = mock(() => ollamaResponse("unknown"));
+  expect(await callOllama("http://localhost:11434", "qwen3:4b", "hi", 2000)).toBeNull();
+});
+
+test("returns null on non-ok response", async () => {
+  globalThis.fetch = mock(() => ollamaResponse("", false));
+  expect(await callOllama("http://localhost:11434", "qwen3:4b", "hi", 2000)).toBeNull();
 });
 
 test("returns null on network error", async () => {
   globalThis.fetch = mock(() => Promise.reject(new Error("ECONNREFUSED")));
-  const tier = await callClassifier("http://localhost:8080", [], 2000);
-  expect(tier).toBeNull();
+  expect(await callOllama("http://localhost:11434", "qwen3:4b", "hi", 2000)).toBeNull();
 });
 
-test("returns null on abort (timeout)", async () => {
+test("returns null on timeout", async () => {
   globalThis.fetch = mock(
     () => new Promise((_, reject) => setTimeout(() => reject(new DOMException("aborted", "AbortError")), 50))
   );
-  const tier = await callClassifier("http://localhost:8080", [], 10);
-  expect(tier).toBeNull();
+  expect(await callOllama("http://localhost:11434", "qwen3:4b", "hi", 10)).toBeNull();
 });
