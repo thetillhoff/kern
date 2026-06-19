@@ -1,7 +1,7 @@
 {
   "rules": [
     { "if": { "keywords": ["ls", "grep", "cat", "echo", "pwd", "which", "cd", "find", "touch", "mkdir"] }, "then": "light" },
-    { "if": { "keywords": ["architecture", "design system", "strategic", "review all", "deep dive", "compare options", "tradeoffs"] }, "then": "heavy" },
+    { "if": { "keywords": ["architecture", "design system", "strategic", "review all", "deep dive", "compare options", "tradeoffs", "research", "think"] }, "then": "heavy" },
     { "if": { "tokenCount": { "gt": 8000 } }, "then": "heavy" }
   ],
   "defaultModel": "claude-sonnet-4-6",
