@@ -36,3 +36,19 @@ test("is a no-op when the pattern already exists", () => {
 	const after = JSON.parse(readFileSync(path, "utf-8"));
 	expect(after.bashSafety.allowlist).toEqual(["git *"]);
 });
+
+test("creates a new file when the settings path does not exist", () => {
+	const dir = mkdtempSync(join(tmpdir(), "safebash-"));
+	const path = join(dir, "settings.json");
+	appendAllowlistPattern(path, "git *");
+	const after = JSON.parse(readFileSync(path, "utf-8"));
+	expect(after).toEqual({ bashSafety: { allowlist: ["git *"] } });
+});
+
+test("leaves a malformed settings file byte-for-byte unchanged", () => {
+	const malformed = "{ not json";
+	const path = tmpSettings(malformed);
+	appendAllowlistPattern(path, "git *");
+	const after = readFileSync(path, "utf-8");
+	expect(after).toBe(malformed);
+});

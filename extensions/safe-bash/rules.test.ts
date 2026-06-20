@@ -48,3 +48,7 @@ test("suggestPattern globs the first token", () => {
 	expect(suggestPattern("git push origin main")).toBe("git *");
 	expect(suggestPattern("  rm -rf foo  ")).toBe("rm *");
 });
+
+test("suggestPattern returns ' *' for an empty command", () => {
+	expect(suggestPattern("")).toBe(" *");
+});
