@@ -140,7 +140,7 @@ install.sh                        # symlinks extensions, copies templates
       "mkfs*"
     ],
     "allowlist": [
-      "git *",
+      "git add *",
       "bun *",
       "npm *",
       "npx *",
