@@ -2,6 +2,7 @@ import { afterEach, expect, mock, test } from "bun:test";
 import { fetchText, validateUrl } from "./fetcher.ts";
 
 const originalFetch = globalThis.fetch;
+const setFetch = (impl: unknown) => { globalThis.fetch = impl as typeof fetch; };
 afterEach(() => {
 	globalThis.fetch = originalFetch;
 });
@@ -27,33 +28,33 @@ test("rejects ftp URL", () => {
 });
 
 test("returns plain text as-is", async () => {
-	globalThis.fetch = mock(() =>
+	setFetch(mock(() =>
 		Promise.resolve(
 			new Response("hello world", {
 				headers: { "content-type": "text/plain" },
 			}),
 		),
-	);
+	));
 	expect(await fetchText("https://example.com")).toBe("hello world");
 });
 
 test("strips HTML tags for text/html", async () => {
-	globalThis.fetch = mock(() =>
+	setFetch(mock(() =>
 		Promise.resolve(
 			new Response("<html><body><p>Hello world</p></body></html>", {
 				headers: { "content-type": "text/html" },
 			}),
 		),
-	);
+	));
 	const result = await fetchText("https://example.com");
 	expect(result).not.toContain("<");
 	expect(result).toContain("Hello world");
 });
 
 test("throws on HTTP error status", async () => {
-	globalThis.fetch = mock(() =>
+	setFetch(mock(() =>
 		Promise.resolve(new Response("Not Found", { status: 404 })),
-	);
+	));
 	await expect(fetchText("https://example.com")).rejects.toThrow("HTTP 404");
 });
 

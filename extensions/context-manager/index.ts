@@ -23,7 +23,7 @@ export default function (pi: ExtensionAPI) {
 
 		appendCompactionLog(logPath, {
 			ts: new Date().toISOString(),
-			session: ctx.sessionManager.getBranch() ?? "unknown",
+			session: ctx.sessionManager.getSessionId(),
 			tokensBefore,
 			tokensLimit,
 			trigger: "auto",
