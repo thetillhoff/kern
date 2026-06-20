@@ -125,16 +125,9 @@ export default function (pi: ExtensionAPI) {
       }
 
       if (sub === "enable") {
-        const defaultUrl = "http://localhost:11434";
-        let url = value;
-        if (!url) {
-          const input = await ctx.ui.input(`Ollama URL (enter for: ${defaultUrl})`, defaultUrl);
-          if (input === undefined) return;
-          url = input || defaultUrl;
-        }
-        config.ollamaUrl = url;
+        config.ollamaUrl = "http://localhost:11434";
         saveConfig(rulesPath, config);
-        ctx.ui.notify(`ollama enabled → ${config.ollamaUrl} (model: ${config.ollamaModel})`, "info");
+        ctx.ui.notify(`ollama enabled → ${config.ollamaUrl} (model: ${config.ollamaModel}) — use /ollama url <url> to change`, "info");
         return;
       }
 
