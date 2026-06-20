@@ -99,7 +99,12 @@ export default function (pi: ExtensionAPI) {
 
   pi.registerCommand("ollama", {
     description: "Configure Ollama classifier (enable/disable/status/url/model)",
-    getArgumentCompletions: () => ["status", "enable", "disable", "url", "model"],
+    getArgumentCompletions: (prefix) => {
+      if (/^(enable|url)\s/.test(prefix)) {
+        return [{ value: "http://localhost:11434", label: "http://localhost:11434", description: "default" }];
+      }
+      return ["status", "enable", "disable", "url", "model"].map((v) => ({ value: v, label: v }));
+    },
     handler: async (args, ctx) => {
       const config = loadConfig(rulesPath);
       const [sub, ...rest] = args.trim().split(/\s+/);
@@ -120,7 +125,14 @@ export default function (pi: ExtensionAPI) {
       }
 
       if (sub === "enable") {
-        config.ollamaUrl = value || "http://localhost:11434";
+        const defaultUrl = "http://localhost:11434";
+        let url = value;
+        if (!url) {
+          const input = await ctx.ui.input("Ollama URL", defaultUrl);
+          if (input === undefined) return;
+          url = input || defaultUrl;
+        }
+        config.ollamaUrl = url;
         saveConfig(rulesPath, config);
         ctx.ui.notify(`ollama enabled → ${config.ollamaUrl} (model: ${config.ollamaModel})`, "info");
         return;
