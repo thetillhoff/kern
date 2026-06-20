@@ -1,8 +1,8 @@
 {
   "rules": [
-    { "if": { "keywords": ["ls", "grep", "cat", "echo", "pwd", "which", "cd", "find", "touch", "mkdir"] }, "then": "light" },
-    { "if": { "keywords": ["architecture", "design system", "strategic", "review all", "deep dive", "compare options", "tradeoffs", "research", "think"] }, "then": "heavy" },
-    { "if": { "tokenCount": { "gt": 8000 } }, "then": "heavy" }
+    { "if": { "keywords": ["ls", "grep", "cat", "echo", "pwd", "which", "cd", "find", "touch", "mkdir"] }, "tier": "light" },
+    { "if": { "keywords": ["architecture", "design system", "strategic", "review all", "deep dive", "compare options", "tradeoffs", "research", "think"] }, "tier": "heavy" },
+    { "if": { "tokenCount": { "gt": 8000 } }, "tier": "heavy" }
   ],
   "ollamaUrl": null,
   "ollamaModel": "qwen3:4b",

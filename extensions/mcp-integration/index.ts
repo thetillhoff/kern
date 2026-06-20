@@ -1,62 +1,85 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Type } from "typebox";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
 import { loadMcpConfig } from "./config.ts";
 import { fetchMcpTools, type McpTool } from "./discovery.ts";
 
 export default async function (pi: ExtensionAPI) {
-  const configPath = join(homedir(), ".pi", "mcp.json");
-  const config = loadMcpConfig(configPath);
+	const configPath = join(homedir(), ".pi", "mcp.json");
+	const config = loadMcpConfig(configPath);
 
-  if (config.servers.length === 0) return;
+	if (config.servers.length === 0) return;
 
-  pi.on("resources_discover", async (_event, ctx) => {
-    for (const server of config.servers) {
-      const tools = await fetchMcpTools(server.url);
-      if (tools.length === 0) continue;
+	pi.on("resources_discover", async (_event, ctx) => {
+		for (const server of config.servers) {
+			const tools = await fetchMcpTools(server.url);
+			if (tools.length === 0) continue;
 
-      for (const tool of tools) {
-        registerMcpTool(pi, server.name, server.url, tool);
-      }
+			for (const tool of tools) {
+				registerMcpTool(pi, server.name, server.url, tool);
+			}
 
-      ctx.ui.notify(`MCP: registered ${tools.length} tool(s) from ${server.name}`, "info");
-    }
-  });
+			ctx.ui.notify(
+				`MCP: registered ${tools.length} tool(s) from ${server.name}`,
+				"info",
+			);
+		}
+	});
 }
 
 function mcpParamType(type: string, description?: string) {
-  switch (type) {
-    case "boolean": return Type.Boolean({ description });
-    case "integer": return Type.Integer({ description });
-    case "number": return Type.Number({ description });
-    case "object": return Type.Object({}, { description });
-    case "array": return Type.Array(Type.Unknown(), { description });
-    default: return Type.String({ description });
-  }
+	switch (type) {
+		case "boolean":
+			return Type.Boolean({ description });
+		case "integer":
+			return Type.Integer({ description });
+		case "number":
+			return Type.Number({ description });
+		case "object":
+			return Type.Object({}, { description });
+		case "array":
+			return Type.Array(Type.Unknown(), { description });
+		default:
+			return Type.String({ description });
+	}
 }
 
-function registerMcpTool(pi: ExtensionAPI, serverName: string, serverUrl: string, tool: McpTool): void {
-  const props: Record<string, ReturnType<typeof Type.String>> = {};
-  for (const param of tool.parameters ?? []) {
-    props[param.name] = mcpParamType(param.type, param.description) as ReturnType<typeof Type.String>;
-  }
+function registerMcpTool(
+	pi: ExtensionAPI,
+	serverName: string,
+	serverUrl: string,
+	tool: McpTool,
+): void {
+	const props: Record<string, ReturnType<typeof Type.String>> = {};
+	for (const param of tool.parameters ?? []) {
+		props[param.name] = mcpParamType(
+			param.type,
+			param.description,
+		) as ReturnType<typeof Type.String>;
+	}
 
-  pi.registerTool({
-    name: `mcp__${serverName}__${tool.name}`,
-    label: `${serverName}: ${tool.name}`,
-    description: tool.description,
-    parameters: Type.Object(props),
-    async execute(_id, params, signal) {
-      const response = await fetch(`${serverUrl}/tools/${tool.name}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ parameters: params }),
-        signal,
-      });
-      const result = (await response.json()) as { output?: string };
-      const text = typeof result.output === "string" ? result.output : JSON.stringify(result);
-      return { content: [{ type: "text", text }], details: { server: serverName, tool: tool.name } };
-    },
-  });
+	pi.registerTool({
+		name: `mcp__${serverName}__${tool.name}`,
+		label: `${serverName}: ${tool.name}`,
+		description: tool.description,
+		parameters: Type.Object(props),
+		async execute(_id, params, signal) {
+			const response = await fetch(`${serverUrl}/tools/${tool.name}`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ parameters: params }),
+				signal,
+			});
+			const result = (await response.json()) as { output?: string };
+			const text =
+				typeof result.output === "string"
+					? result.output
+					: JSON.stringify(result);
+			return {
+				content: [{ type: "text", text }],
+				details: { server: serverName, tool: tool.name },
+			};
+		},
+	});
 }
