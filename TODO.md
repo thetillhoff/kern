@@ -18,6 +18,9 @@ Nothing queued. See Backlog.
   (light/medium/heavy, reuses model-router's `model-rules.json` map), optional `tools`
   allowlist. `executionMode: "parallel"` so the model can fan out. Parent abort signal wired
   to `session.abort()`; `dispose()` in finally. Pi's tool-permission gate handles approve/deny.
+- **Deleted `router/`** - The Python proxy was orphaned: tier-2 classification moved into the
+  `model-router` extension (direct Ollama HTTP), nothing referenced the proxy. Removed the dir
+  and all README references (Docker run, structure tree, dev test command).
 
 - **Smoke test** - All 6 extensions load, model routing works end-to-end with real Pi
 - **`modelRegistry.find()`** - Fixed: `getAll().find(m => m.id === modelName)` (API requires
