@@ -1,5 +1,5 @@
 const SYSTEM_PROMPT = `Classify the user message into exactly one routing tier.
-Reply with a single word only — no punctuation, no explanation.
+Reply with a single bare word only — no quotes, no punctuation, no explanation.
 
 Tiers:
 - light: shell commands, quick lookups
