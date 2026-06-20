@@ -56,6 +56,7 @@ export default function (pi: ExtensionAPI) {
 		const start = Date.now();
 
 		const session = ctx.sessionManager.getSessionId();
+		const sessionModel = ctx.model as { id?: string } | undefined;
 
 		async function setModelByName(modelName: string): Promise<void> {
 			const model = ctx.modelRegistry.getAll().find((m) => m.id === modelName);
@@ -112,10 +113,7 @@ export default function (pi: ExtensionAPI) {
 				ts: new Date().toISOString(),
 				session,
 				tier: "default",
-				model: currentModelId(
-					ctx.model as { id?: string } | undefined,
-					config.defaultModel,
-				),
+				model: currentModelId(sessionModel, config.defaultModel),
 				reason: "ollama-failed",
 				latencyMs: Date.now() - start,
 			});
