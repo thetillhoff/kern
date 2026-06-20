@@ -1,8 +1,4 @@
-__pycache__/
-*.egg-info/
-.venv/
+node_modules/
 dist/
 .env
-*.pyc
-node_modules/
 .DS_Store
