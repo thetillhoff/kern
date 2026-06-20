@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { applyRules, estimateTokens, type RoutingRule } from "./rules.ts";
@@ -13,6 +13,10 @@ interface RouterConfig {
   classifierTimeoutMs: number;
   defaultModel: string | null;
   models: Record<string, string>;
+}
+
+function saveConfig(rulesPath: string, config: RouterConfig): void {
+  writeFileSync(rulesPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
 }
 
 function loadConfig(rulesPath: string): RouterConfig {
@@ -91,5 +95,54 @@ export default function (pi: ExtensionAPI) {
       reason: "default",
       latencyMs: Date.now() - start,
     });
+  });
+
+  pi.registerCommand("ollama", {
+    description: "Configure Ollama classifier (enable/disable/status/url/model)",
+    getArgumentCompletions: () => ["status", "enable", "disable", "url", "model"],
+    handler: async (args, ctx) => {
+      const config = loadConfig(rulesPath);
+      const [sub, ...rest] = args.trim().split(/\s+/);
+      const value = rest.join(" ");
+
+      if (!sub || sub === "status") {
+        const on = !!config.ollamaUrl;
+        ctx.ui.notify(
+          `ollama: ${on ? "enabled" : "disabled"} | url: ${config.ollamaUrl ?? "null"} | model: ${config.ollamaModel ?? "unset"}`,
+          "info"
+        );
+        return;
+      }
+
+      if (sub === "enable") {
+        config.ollamaUrl = value || "http://localhost:11434";
+        saveConfig(rulesPath, config);
+        ctx.ui.notify(`ollama enabled → ${config.ollamaUrl} (model: ${config.ollamaModel})`, "info");
+        return;
+      }
+
+      if (sub === "disable") {
+        config.ollamaUrl = null;
+        saveConfig(rulesPath, config);
+        ctx.ui.notify("ollama disabled", "info");
+        return;
+      }
+
+      if (sub === "url" && value) {
+        config.ollamaUrl = value;
+        saveConfig(rulesPath, config);
+        ctx.ui.notify(`ollama url → ${value}`, "info");
+        return;
+      }
+
+      if (sub === "model" && value) {
+        config.ollamaModel = value;
+        saveConfig(rulesPath, config);
+        ctx.ui.notify(`ollama model → ${value}`, "info");
+        return;
+      }
+
+      ctx.ui.notify("usage: /ollama [status|enable [url]|disable|url <url>|model <name>]", "warning");
+    },
   });
 }
