@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { callOllama } from "./classifier.ts";
+import { currentModelId } from "./decision.ts";
 import { appendDecision } from "./logger.ts";
 import { applyRules, estimateTokens, type RoutingRule } from "./rules.ts";
 
@@ -105,6 +106,20 @@ export default function (pi: ExtensionAPI) {
 				});
 				return;
 			}
+			// Classifier ran but produced no usable tier: record the failure
+			// instead of silently falling through to the default reason.
+			appendDecision(logPath, {
+				ts: new Date().toISOString(),
+				session,
+				tier: "default",
+				model: currentModelId(
+					ctx.model as { id?: string } | undefined,
+					config.defaultModel,
+				),
+				reason: "ollama-failed",
+				latencyMs: Date.now() - start,
+			});
+			return;
 		}
 
 		// Tier 3: default — no model change; Pi uses whatever is configured
@@ -112,10 +127,10 @@ export default function (pi: ExtensionAPI) {
 			ts: new Date().toISOString(),
 			session,
 			tier: "default",
-			model:
-				config.defaultModel ??
-				(ctx.model as { id?: string } | null)?.id ??
-				"unknown",
+			model: currentModelId(
+				ctx.model as { id?: string } | undefined,
+				config.defaultModel,
+			),
 			reason: "default",
 			latencyMs: Date.now() - start,
 		});
