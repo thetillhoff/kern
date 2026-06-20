@@ -26,7 +26,7 @@ export async function callOllama(
     clearTimeout(timer);
     if (!res.ok) return null;
     const data = await res.json() as { response?: string };
-    return data.response?.toLowerCase().split(/\s+/).find((w) => VALID_TIERS.has(w)) ?? null;
+    return data.response?.toLowerCase().split(/\s+/).map((w) => w.replace(/[^a-z]/g, "")).find((w) => VALID_TIERS.has(w)) ?? null;
   } catch {
     clearTimeout(timer);
     return null;
