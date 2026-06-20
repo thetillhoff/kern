@@ -23,10 +23,7 @@ export function applyRules(
 	for (const rule of rules) {
 		const { if: cond } = rule;
 
-		if (
-			cond.keywords &&
-			cond.keywords.some((k) => lower.includes(k.toLowerCase()))
-		) {
+		if (cond.keywords?.some((k) => lower.includes(k.toLowerCase()))) {
 			return rule.tier;
 		}
 
