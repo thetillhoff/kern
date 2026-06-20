@@ -6,7 +6,7 @@ export interface RouterDecision {
 	session: string;
 	tier: string;
 	model: string;
-	reason: "rule" | "classifier" | "default";
+	reason: "rule" | "ollama" | "classifier" | "default";
 	rule?: string;
 	latencyMs: number;
 }
