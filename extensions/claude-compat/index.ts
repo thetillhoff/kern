@@ -8,11 +8,7 @@ export default function (pi: ExtensionAPI) {
 
 	pi.on("before_agent_start", async (event, ctx) => {
 		const content = loadPIMd(ctx.cwd, globalDir);
-		if (content) {
-			(event as unknown as { systemPrompt: string }).systemPrompt =
-				((event as unknown as { systemPrompt?: string }).systemPrompt ?? "") +
-				"\n\n" +
-				content;
-		}
+		if (!content) return;
+		return { systemPrompt: `${event.systemPrompt}\n\n${content}` };
 	});
 }
