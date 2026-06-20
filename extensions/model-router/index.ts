@@ -128,7 +128,7 @@ export default function (pi: ExtensionAPI) {
         const defaultUrl = "http://localhost:11434";
         let url = value;
         if (!url) {
-          const input = await ctx.ui.input("Ollama URL", defaultUrl);
+          const input = await ctx.ui.input(`Ollama URL (enter for: ${defaultUrl})`, defaultUrl);
           if (input === undefined) return;
           url = input || defaultUrl;
         }
