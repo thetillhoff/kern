@@ -105,7 +105,12 @@ export default function (pi: ExtensionAPI) {
       const [sub, ...rest] = args.trim().split(/\s+/);
       const value = rest.join(" ");
 
-      if (!sub || sub === "status") {
+      if (!sub) {
+        ctx.ui.notify("subcommands: status · enable [url] · disable · url <url> · model <name>", "info");
+        return;
+      }
+
+      if (sub === "status") {
         const on = !!config.ollamaUrl;
         ctx.ui.notify(
           `ollama: ${on ? "enabled" : "disabled"} | url: ${config.ollamaUrl ?? "null"} | model: ${config.ollamaModel ?? "unset"}`,
@@ -142,7 +147,7 @@ export default function (pi: ExtensionAPI) {
         return;
       }
 
-      ctx.ui.notify("usage: /ollama [status|enable [url]|disable|url <url>|model <name>]", "warning");
+      ctx.ui.notify("unknown subcommand. try: status · enable [url] · disable · url <url> · model <name>", "warning");
     },
   });
 }
