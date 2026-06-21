@@ -190,18 +190,24 @@ export default function (pi: ExtensionAPI) {
 		}
 	});
 
-	// Warm the classifier model as the user starts typing, so the first real
-	// classification isn't a cold load. Throttled to once per WARMUP_INTERVAL_MS.
+	// Warm the classifier model so the first real classification isn't a cold
+	// load (~14s cold vs ~1s warm). Fire on session start (earliest chance) and
+	// again as the user types, in case it was evicted since. Throttled to once
+	// per WARMUP_INTERVAL_MS so repeated subagent spawns don't spam Ollama.
 	let lastWarmup = 0;
+	const maybeWarmup = (url: string, model: string) => {
+		const now = Date.now();
+		if (now - lastWarmup > WARMUP_INTERVAL_MS) {
+			lastWarmup = now;
+			warmupOllama(url, model);
+		}
+	};
 	pi.on("session_start", (_event, ctx) => {
 		const { ollamaUrl, ollamaModel } = loadConfig(rulesPath);
 		if (!ollamaUrl || !ollamaModel) return;
+		maybeWarmup(ollamaUrl, ollamaModel);
 		ctx.ui.onTerminalInput(() => {
-			const now = Date.now();
-			if (now - lastWarmup > WARMUP_INTERVAL_MS) {
-				lastWarmup = now;
-				warmupOllama(ollamaUrl, ollamaModel);
-			}
+			maybeWarmup(ollamaUrl, ollamaModel);
 			return undefined;
 		});
 	});
