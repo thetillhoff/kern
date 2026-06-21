@@ -8,6 +8,16 @@ Nothing queued. See Backlog.
 
 ## Done This Session
 
+- **`model-router` explicit-first redesign** - The router is now the single model selector for
+  every session. Precedence: explicit (a subagent `model_tier` via `setTierOverride`, or a
+  human-pinned model) → Ollama classifier → light fallback (`models.light`). Removed the preset
+  keyword/token rules entirely. The override store (`override.ts`) is backed by `globalThis`
+  because the extension loader gives `task` and `model-router` separate module graphs - a plain
+  module-level Map was not shared between them. Human launch `--model` is honored by comparing
+  the live model to `settings.json`'s `defaultModel` baseline (a launch flag emits no
+  `model_select` event). `task` no longer pre-resolves a model; it passes the tier to the child
+  router and logs the actual `session.model`. `~/.pi/model-decisions.jsonl` is the debug trace;
+  the actual model lives in `subagent.jsonl` + tool `details`. Verified live; see SMOKE.md.
 - **`task` subagent escalation** - Rewrote the extension into a continuation engine.
   `task.execute` no longer awaits the child to completion; it races the child's `prompt()`
   against a question signal and an optional `timeout_ms`. A subagent calls the new `ask-caller`
@@ -52,6 +62,10 @@ Things worth doing but not blocking immediate use.
   wildcard to be at the end (`rm -rf *`). Add support for `*rm -rf*` style patterns.
 - **`model-router`: per-project rules** - Load `.pi/model-rules.json` as a project-level
   override on top of `~/.pi/model-rules.json`, same precedence as `PI.md`.
+- **`model-router`: clear pin/router-set maps on session end** - `override.ts`'s
+  `pinnedSessions`/`routerSet` (globalThis-backed) are never cleared, so entries accumulate for
+  the process lifetime and a human re-selecting the exact model the router last set is not
+  pinned. Clear a session's entries on `session_shutdown`/dispose.
 - **`model-router`: Ollama mobile path** - Ollama won't work on mobile; consider
   Transformers.js (ONNX) as a portable embedded classifier for cross-platform use.
 - **`fetch-url`: respect `robots.txt`** - Currently ignores it. Add a flag to enable/disable.
