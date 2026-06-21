@@ -6,7 +6,7 @@ export interface RouterDecision {
 	session: string;
 	tier: string;
 	model: string;
-	reason: "explicit" | "ollama" | "fallback";
+	reason: "explicit" | "ollama" | "fallback" | "ollama-late";
 	latencyMs: number;
 }
 

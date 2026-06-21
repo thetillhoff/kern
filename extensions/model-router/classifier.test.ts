@@ -17,52 +17,55 @@ function ollamaResponse(text: string, ok = true) {
 	);
 }
 
-test("returns tier from ollama response", async () => {
+test("returns tier and a latency from ollama response", async () => {
 	setFetch(mock(() => ollamaResponse("heavy")));
-	expect(
-		await callOllama(
-			"http://localhost:11434",
-			"qwen3:4b",
-			"design the architecture",
-			2000,
-		),
-	).toBe("heavy");
+	const result = await callOllama(
+		"http://localhost:11434",
+		"qwen3:4b",
+		"design the architecture",
+		2000,
+	);
+	expect(result.tier).toBe("heavy");
+	expect(typeof result.latencyMs).toBe("number");
+	expect(result.latencyMs).toBeGreaterThanOrEqual(0);
 });
 
 test("picks first valid word from verbose response", async () => {
 	setFetch(mock(() => ollamaResponse("I think this is medium complexity.")));
 	expect(
-		await callOllama(
-			"http://localhost:11434",
-			"qwen3:4b",
-			"write a function",
-			2000,
-		),
+		(
+			await callOllama(
+				"http://localhost:11434",
+				"qwen3:4b",
+				"write a function",
+				2000,
+			)
+		).tier,
 	).toBe("medium");
 });
 
-test("returns null for unrecognized response", async () => {
+test("returns null tier for unrecognized response", async () => {
 	setFetch(mock(() => ollamaResponse("unknown")));
 	expect(
-		await callOllama("http://localhost:11434", "qwen3:4b", "hi", 2000),
+		(await callOllama("http://localhost:11434", "qwen3:4b", "hi", 2000)).tier,
 	).toBeNull();
 });
 
-test("returns null on non-ok response", async () => {
+test("returns null tier on non-ok response", async () => {
 	setFetch(mock(() => ollamaResponse("", false)));
 	expect(
-		await callOllama("http://localhost:11434", "qwen3:4b", "hi", 2000),
+		(await callOllama("http://localhost:11434", "qwen3:4b", "hi", 2000)).tier,
 	).toBeNull();
 });
 
-test("returns null on network error", async () => {
+test("returns null tier on network error", async () => {
 	setFetch(mock(() => Promise.reject(new Error("ECONNREFUSED"))));
 	expect(
-		await callOllama("http://localhost:11434", "qwen3:4b", "hi", 2000),
+		(await callOllama("http://localhost:11434", "qwen3:4b", "hi", 2000)).tier,
 	).toBeNull();
 });
 
-test("returns null on timeout", async () => {
+test("returns null tier on timeout", async () => {
 	setFetch(
 		mock(
 			() =>
@@ -75,6 +78,6 @@ test("returns null on timeout", async () => {
 		),
 	);
 	expect(
-		await callOllama("http://localhost:11434", "qwen3:4b", "hi", 10),
+		(await callOllama("http://localhost:11434", "qwen3:4b", "hi", 10)).tier,
 	).toBeNull();
 });
