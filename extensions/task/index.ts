@@ -114,7 +114,7 @@ async function runSegment(
 	},
 	timeoutMs: number | undefined,
 ): Promise<ToolResult> {
-	const modelId = ctx.model?.id ?? "default";
+	const modelId = entry.model;
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	const timeout = new Promise<"timeout">((resolve) => {
 		if (timeoutMs && timeoutMs > 0)
@@ -122,6 +122,7 @@ async function runSegment(
 	});
 	const completed = (entry.runPromise ?? Promise.resolve()).then(
 		() => "completed" as const,
+		(err) => ({ failed: err instanceof Error ? err.message : String(err) }),
 	);
 	const asked = entry.questionSignal.promise.then((q) => ({
 		question: q.question,
@@ -147,6 +148,18 @@ async function runSegment(
 				{ type: "text", text: `Subagent timed out after ${timeoutMs}ms.` },
 			],
 			details: { status: "timeout", tokens: entry.tokensTotal },
+		};
+	}
+
+	if (typeof outcome === "object" && outcome !== null && "failed" in outcome) {
+		entry.status = "aborted";
+		logEvent(entry, parentSession, childId, modelId, "aborted");
+		entry.session.dispose();
+		registry.delete(childId);
+		ctx.ui.setStatus("subagents", undefined);
+		return {
+			content: [{ type: "text", text: `Subagent failed: ${outcome.failed}` }],
+			details: { status: "aborted", tokens: entry.tokensTotal },
 		};
 	}
 
@@ -252,7 +265,7 @@ export default function (pi: ExtensionAPI) {
 						details: { status: "error" },
 					};
 				}
-				logEvent(entry, parentSession, params.resume, "", "answered");
+				logEvent(entry, parentSession, params.resume, entry.model, "answered");
 				const resolve = entry.resolveAsk;
 				entry.resolveAsk = undefined;
 				entry.questionSignal = deferred<{ question: string }>();
@@ -348,6 +361,7 @@ export default function (pi: ExtensionAPI) {
 			const childId = session.sessionId;
 			const entry: ChildEntry = {
 				session,
+				model: model?.id ?? "default",
 				questionSignal: deferred<{ question: string }>(),
 				tokensTotal: 0,
 				status: "running" as ChildEntry["status"],
