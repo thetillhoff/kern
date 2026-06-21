@@ -5,10 +5,15 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { callOllama } from "./classifier.ts";
 import { currentModelId } from "./decision.ts";
 import { appendDecision } from "./logger.ts";
-import { applyRules, estimateTokens, type RoutingRule } from "./rules.ts";
+import {
+	isPinned,
+	noteRouterSet,
+	pinSession,
+	takeTierOverride,
+	wasRouterSet,
+} from "./override.ts";
 
 interface RouterConfig {
-	rules: RoutingRule[];
 	ollamaUrl: string | null;
 	ollamaModel: string | null;
 	classifierTimeoutMs: number;
@@ -20,10 +25,24 @@ function saveConfig(rulesPath: string, config: RouterConfig): void {
 	writeFileSync(rulesPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
 }
 
+// The model a session starts on absent any selection: settings.json's
+// defaultModel. A live model differing from this baseline means the human
+// chose it explicitly (e.g. `pi --model X`), which the router must honor.
+function loadSettingsDefaultModel(settingsPath: string): string | null {
+	if (!existsSync(settingsPath)) return null;
+	try {
+		const s = JSON.parse(readFileSync(settingsPath, "utf-8")) as {
+			defaultModel?: string;
+		};
+		return s.defaultModel ?? null;
+	} catch {
+		return null;
+	}
+}
+
 function loadConfig(rulesPath: string): RouterConfig {
 	if (!existsSync(rulesPath)) {
 		return {
-			rules: [],
 			ollamaUrl: null,
 			ollamaModel: null,
 			classifierTimeoutMs: 2000,
@@ -35,7 +54,6 @@ function loadConfig(rulesPath: string): RouterConfig {
 		return JSON.parse(readFileSync(rulesPath, "utf-8")) as RouterConfig;
 	} catch {
 		return {
-			rules: [],
 			ollamaUrl: null,
 			ollamaModel: null,
 			classifierTimeoutMs: 2000,
@@ -48,90 +66,99 @@ function loadConfig(rulesPath: string): RouterConfig {
 export default function (pi: ExtensionAPI) {
 	const rulesPath = join(homedir(), ".pi", "model-rules.json");
 	const logPath = join(homedir(), ".pi", "model-decisions.jsonl");
+	const settingsPath = join(homedir(), ".pi", "agent", "settings.json");
 
-	pi.on("before_agent_start", async (event, ctx) => {
+	pi.on("before_agent_start", async (_event, ctx) => {
 		const config = loadConfig(rulesPath);
-		const lastMessage = event.prompt;
-		const tokenCount = estimateTokens(event.prompt);
+		const session = ctx.sessionManager.getSessionId();
 		const start = Date.now();
 
-		const session = ctx.sessionManager.getSessionId();
-		const sessionModel = ctx.model as { id?: string } | undefined;
-
-		async function setModelByName(modelName: string): Promise<void> {
-			const model = ctx.modelRegistry.getAll().find((m) => m.id === modelName);
-			if (model) {
-				await pi.setModel(model);
-			} else {
-				console.warn(
-					`[model-router] model not found in registry: ${modelName}`,
-				);
+		async function setModelByTier(
+			tier: string,
+			reason: "explicit" | "ollama" | "fallback",
+		): Promise<void> {
+			const modelName = config.models?.[tier] ?? config.defaultModel;
+			if (modelName) {
+				const model = ctx.modelRegistry
+					.getAll()
+					.find((m) => m.id === modelName);
+				if (model) {
+					noteRouterSet(session, modelName);
+					await pi.setModel(model);
+				} else {
+					console.warn(`[model-router] model not found: ${modelName}`);
+				}
 			}
-		}
-
-		// Tier 1: rule-based fast path
-		const ruleTier = applyRules(lastMessage, tokenCount, config.rules ?? []);
-		if (ruleTier) {
-			const modelName = config.models?.[ruleTier] ?? config.defaultModel;
-			if (modelName) await setModelByName(modelName);
 			appendDecision(logPath, {
 				ts: new Date().toISOString(),
 				session,
-				tier: ruleTier,
+				tier,
 				model: modelName ?? "unknown",
-				reason: "rule",
-				rule: ruleTier,
+				reason,
+				latencyMs: Date.now() - start,
+			});
+		}
+
+		// 1. Explicit subagent tier override (from a task() call). Hard win.
+		const overrideTier = takeTierOverride(session);
+		if (overrideTier) {
+			await setModelByTier(overrideTier, "explicit");
+			return;
+		}
+
+		// First-turn human --model: a launch flag does not emit a model_select
+		// event, so detect it here. If the live model differs from the startup
+		// default and the router did not set it, the human pinned it explicitly.
+		const liveId = (ctx.model as { id?: string } | undefined)?.id;
+		if (liveId && !isPinned(session) && !wasRouterSet(session, liveId)) {
+			const settingsDefault = loadSettingsDefaultModel(settingsPath);
+			if (settingsDefault && liveId !== settingsDefault) {
+				pinSession(session);
+			}
+		}
+
+		// 2. Human-pinned session: keep whatever model the human selected.
+		if (isPinned(session)) {
+			appendDecision(logPath, {
+				ts: new Date().toISOString(),
+				session,
+				tier: "explicit",
+				model: currentModelId(
+					ctx.model as { id?: string } | undefined,
+					config.defaultModel,
+				),
+				reason: "explicit",
 				latencyMs: Date.now() - start,
 			});
 			return;
 		}
 
-		// Tier 2: Ollama classifier
+		// 3. Ollama classifier.
 		if (config.ollamaUrl && config.ollamaModel) {
 			const tier = await callOllama(
 				config.ollamaUrl,
 				config.ollamaModel,
-				lastMessage,
+				_event.prompt,
 				config.classifierTimeoutMs ?? 2000,
 			);
 			if (tier) {
-				const modelName = config.models?.[tier] ?? config.defaultModel;
-				if (modelName) await setModelByName(modelName);
-				appendDecision(logPath, {
-					ts: new Date().toISOString(),
-					session,
-					tier,
-					model: modelName ?? "unknown",
-					reason: "ollama",
-					latencyMs: Date.now() - start,
-				});
+				await setModelByTier(tier, "ollama");
 				return;
 			}
-			// Classifier ran but produced no usable tier: record the failure
-			// instead of silently falling through to the default reason.
-			appendDecision(logPath, {
-				ts: new Date().toISOString(),
-				session,
-				tier: "default",
-				model: currentModelId(sessionModel, config.defaultModel),
-				reason: "ollama-failed",
-				latencyMs: Date.now() - start,
-			});
-			return;
 		}
 
-		// Tier 3: default — no model change; Pi uses whatever is configured
-		appendDecision(logPath, {
-			ts: new Date().toISOString(),
-			session,
-			tier: "default",
-			model: currentModelId(
-				ctx.model as { id?: string } | undefined,
-				config.defaultModel,
-			),
-			reason: "default",
-			latencyMs: Date.now() - start,
-		});
+		// 4. Fallback to the light model when no classifier answer.
+		await setModelByTier("light", "fallback");
+	});
+
+	// Pin a session when the human (not the router) selects a model.
+	pi.on("model_select", (event, ctx) => {
+		const session = ctx.sessionManager.getSessionId();
+		const modelId = (event.model as { id?: string }).id ?? "";
+		if (wasRouterSet(session, modelId)) return; // the router's own set
+		if (event.source === "set" || event.source === "cycle") {
+			pinSession(session);
+		}
 	});
 
 	pi.registerCommand("ollama", {

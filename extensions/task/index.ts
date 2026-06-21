@@ -1,4 +1,3 @@
-import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import {
@@ -6,9 +5,9 @@ import {
 	createAgentSession,
 	DefaultResourceLoader,
 	type ExtensionAPI,
-	type ModelRegistry,
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { setTierOverride } from "../model-router/override.ts";
 import { appendSubagentLog } from "./logger.ts";
 import {
 	augmentTools,
@@ -17,33 +16,6 @@ import {
 	formatTokens,
 	registry,
 } from "./registry.ts";
-
-type RegistryModel = ReturnType<ModelRegistry["getAll"]>[number];
-
-// Look up the model id for a tier in the model-router config on disk.
-export function tierModelId(tier: string | undefined): string | undefined {
-	if (!tier) return undefined;
-	const path = join(homedir(), ".pi", "model-rules.json");
-	if (!existsSync(path)) return undefined;
-	try {
-		const cfg = JSON.parse(readFileSync(path, "utf-8")) as {
-			models?: Record<string, string>;
-		};
-		return cfg.models?.[tier];
-	} catch {
-		return undefined;
-	}
-}
-
-// Reuse the tier → model-id map maintained by the model-router extension.
-function resolveTierModel(
-	tier: string | undefined,
-	modelRegistry: ModelRegistry,
-): RegistryModel | undefined {
-	const id = tierModelId(tier);
-	if (!id) return undefined;
-	return modelRegistry.getAll().find((m) => m.id === id);
-}
 
 type MessageLike = { role: string; content?: unknown };
 
@@ -114,7 +86,6 @@ async function runSegment(
 	},
 	timeoutMs: number | undefined,
 ): Promise<ToolResult> {
-	const modelId = entry.model;
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	const timeout = new Promise<"timeout">((resolve) => {
 		if (timeoutMs && timeoutMs > 0)
@@ -131,6 +102,9 @@ async function runSegment(
 	const outcome = await Promise.race([completed, asked, timeout]);
 	if (timer) clearTimeout(timer);
 
+	// Capture the actual model the child router chose (available once prompt() starts).
+	entry.model = entry.session.model?.id ?? entry.model;
+
 	entry.tokensTotal = readChildTokens(entry.session);
 	ctx.ui.setStatus(
 		"subagents",
@@ -139,7 +113,7 @@ async function runSegment(
 
 	if (outcome === "timeout") {
 		entry.status = "timeout";
-		logEvent(entry, parentSession, childId, modelId, "timeout");
+		logEvent(entry, parentSession, childId, entry.model, "timeout");
 		await entry.session.abort();
 		entry.session.dispose();
 		registry.delete(childId);
@@ -147,25 +121,33 @@ async function runSegment(
 			content: [
 				{ type: "text", text: `Subagent timed out after ${timeoutMs}ms.` },
 			],
-			details: { status: "timeout", tokens: entry.tokensTotal },
+			details: {
+				status: "timeout",
+				model: entry.model,
+				tokens: entry.tokensTotal,
+			},
 		};
 	}
 
 	if (typeof outcome === "object" && outcome !== null && "failed" in outcome) {
 		entry.status = "aborted";
-		logEvent(entry, parentSession, childId, modelId, "aborted");
+		logEvent(entry, parentSession, childId, entry.model, "aborted");
 		entry.session.dispose();
 		registry.delete(childId);
 		ctx.ui.setStatus("subagents", undefined);
 		return {
 			content: [{ type: "text", text: `Subagent failed: ${outcome.failed}` }],
-			details: { status: "aborted", tokens: entry.tokensTotal },
+			details: {
+				status: "aborted",
+				model: entry.model,
+				tokens: entry.tokensTotal,
+			},
 		};
 	}
 
 	if (outcome === "completed") {
 		entry.status = "completed";
-		logEvent(entry, parentSession, childId, modelId, "completed");
+		logEvent(entry, parentSession, childId, entry.model, "completed");
 		const text = lastAssistantText(entry.session.messages);
 		entry.session.dispose();
 		registry.delete(childId);
@@ -174,13 +156,17 @@ async function runSegment(
 			content: [
 				{ type: "text", text: text || "(subagent returned no text output)" },
 			],
-			details: { status: "completed", tokens: entry.tokensTotal },
+			details: {
+				status: "completed",
+				model: entry.model,
+				tokens: entry.tokensTotal,
+			},
 		};
 	}
 
 	// outcome is the asked question
 	entry.status = "awaiting_answer" as ChildEntry["status"];
-	logEvent(entry, parentSession, childId, modelId, "asked");
+	logEvent(entry, parentSession, childId, entry.model, "asked");
 	return {
 		content: [
 			{
@@ -190,6 +176,7 @@ async function runSegment(
 		],
 		details: {
 			status: "awaiting_answer",
+			model: entry.model,
 			resume: childId,
 			question: outcome.question,
 			tokens: entry.tokensTotal,
@@ -293,7 +280,6 @@ export default function (pi: ExtensionAPI) {
 				};
 			}
 
-			const model = resolveTierModel(params.model_tier, ctx.modelRegistry);
 			const loader = new DefaultResourceLoader({
 				cwd: ctx.cwd,
 				agentDir: join(homedir(), ".pi", "agent"),
@@ -349,7 +335,6 @@ export default function (pi: ExtensionAPI) {
 				resourceLoader: loader,
 				// biome-ignore lint/suspicious/noExplicitAny: ask-caller's execute ctx is the child's tool context, which the SDK types loosely; the registry-based handshake is verified at runtime in Task 6.
 				customTools: [askCaller as any],
-				...(model ? { model } : {}),
 				...(augmentTools(params.tools)
 					? { tools: augmentTools(params.tools) }
 					: {}),
@@ -359,22 +344,20 @@ export default function (pi: ExtensionAPI) {
 			session.extensionRunner.setUIContext(ctx.ui, ctx.mode);
 
 			const childId = session.sessionId;
+			// Explicit tier (optional) overrides the child router; otherwise the
+			// child router classifies the child prompt itself.
+			if (params.model_tier) setTierOverride(childId, params.model_tier);
+
 			const entry: ChildEntry = {
 				session,
-				model: model?.id ?? "default",
+				model: "pending",
 				questionSignal: deferred<{ question: string }>(),
 				tokensTotal: 0,
 				status: "running" as ChildEntry["status"],
 				startedAt: Date.now(),
 			};
 			registry.set(childId, entry);
-			logEvent(
-				entry,
-				parentSession,
-				childId,
-				model?.id ?? "default",
-				"spawned",
-			);
+			logEvent(entry, parentSession, childId, "pending", "spawned");
 
 			const onAbort = () => void session.abort();
 			signal?.addEventListener("abort", onAbort, { once: true });

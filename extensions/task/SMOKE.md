@@ -75,3 +75,60 @@ Output: tool returned `Subagent timed out after 1ms.` (exit 0). The structured
 
 Confirms: a run segment exceeding `timeout_ms` aborts and disposes the child
 (entry removed from the registry), and the parent run itself still exits 0.
+
+## Explicit-first routing (verified 2026-06-21)
+
+The router is the single model selector for every session: explicit (subagent
+tier override or human-pinned model) → Ollama classifier → light fallback.
+Preset keyword/token rules were removed. `~/.pi/subagent.jsonl` and the tool
+`details` carry the actual model; `~/.pi/model-decisions.jsonl` is the debug
+trace of the router's reasoning. (During these runs the Ollama classifier
+returned no usable tier, so the no-explicit path logged `reason:"fallback"` →
+light, which is the correct degraded behavior.)
+
+### Subagent explicit tier wins
+
+```sh
+timeout 120 pi -p --no-session --tools task \
+"Call the task tool with arguments prompt='Reply with only: HEAVY_OK' and model_tier='heavy'. Report what it returned."
+```
+
+`subagent.jsonl` `completed` shows the heavy model; `model-decisions.jsonl`
+shows `tier:"heavy", reason:"explicit"` for the child - the explicit tier beat
+the router's own classification.
+
+```json
+{"...","childSession":"...","model":"eu.anthropic.claude-opus-4-6-v1","status":"completed"}
+{"...","session":"<child>","tier":"heavy","model":"eu.anthropic.claude-opus-4-6-v1","reason":"explicit"}
+```
+
+### Subagent default goes through the router
+
+```sh
+timeout 120 pi -p --no-session --tools task \
+"Use the task tool to delegate this prompt: 'Reply with only: DEFAULT_OK'. Report what came back."
+```
+
+`subagent.jsonl` `completed` logs the ACTUAL routed model (not `"default"`/
+`"pending"`); `model-decisions.jsonl` shows `reason:"ollama"` or `"fallback"`.
+
+### Human launch `--model` is honored (pinned)
+
+```sh
+pi -p --no-session --model "eu.anthropic.claude-opus-4-6-v1" "Reply with only: PIN_OK"
+```
+
+`model-decisions.jsonl` shows `reason:"explicit"` with the opus model - the
+router did NOT override the human's `--model`. A launch flag emits no
+`model_select` event, so the router detects it by comparing the live model to
+`settings.json`'s `defaultModel` baseline.
+
+### Plain launch still routes (no false pin)
+
+```sh
+pi -p --no-session "Reply with only: PLAIN_OK"
+```
+
+`model-decisions.jsonl` shows `reason:"ollama"`/`"fallback"` (NOT `explicit`) -
+the startup model equals the settings default, so the baseline check does not
+mis-pin it and normal routing runs.

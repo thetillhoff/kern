@@ -23,7 +23,7 @@ pi
 Edit the created config files:
 
 - `~/.pi/agent/settings.json` - default model, bash safety rules
-- `~/.pi/model-rules.json` - keyword/token routing rules
+- `~/.pi/model-rules.json` - tier→model map, Ollama classifier settings, default/fallback model
 - `~/.pi/PI.md` - global instructions injected every session (like `CLAUDE.md`)
 - `~/.pi/mcp.json` - MCP server list for auto-discovery
 
@@ -33,7 +33,7 @@ Edit the created config files:
 | --- | --- |
 | `safe-bash` | Blocks dangerous commands; pre-approves allowlist patterns; prompts for unknown ones with Allow once / Allow always (edited pattern persisted to the shared allowlist) / Deny |
 | `claude-compat` | Loads `~/.pi/PI.md` and `.pi/PI.md` into the system prompt each turn |
-| `model-router` | Routes to light/medium/heavy tier via keyword/token rules, then an Ollama classifier, then a default |
+| `model-router` | Selects the model for every session: an explicit tier (subagent `model_tier`) or human-pinned model wins, else an Ollama classifier picks light/medium/heavy, else a light fallback. Logs the actual model; decisions traced to `~/.pi/model-decisions.jsonl` |
 | `fetch-url` | Adds `fetch_url` tool for reading HTTPS URLs |
 | `context-manager` | Logs context compaction events to `~/.pi/compaction.jsonl` |
 | `mcp-integration` | Auto-discovers tools from MCP servers in `~/.pi/mcp.json` |

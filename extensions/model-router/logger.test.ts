@@ -19,7 +19,7 @@ test("writes valid JSONL line", () => {
 		session: "main",
 		tier: "local",
 		model: "qwen3:4b",
-		reason: "rule" as const,
+		reason: "ollama" as const,
 		latencyMs: 5,
 	};
 	appendDecision(logPath, entry);
@@ -36,7 +36,7 @@ test("appends multiple lines", () => {
 		session: "s",
 		tier: "local",
 		model: "m",
-		reason: "rule",
+		reason: "explicit",
 		latencyMs: 1,
 	});
 	appendDecision(logPath, {
@@ -44,7 +44,7 @@ test("appends multiple lines", () => {
 		session: "s",
 		tier: "heavy",
 		model: "m2",
-		reason: "classifier",
+		reason: "ollama",
 		latencyMs: 200,
 	});
 	const lines = readFileSync(logPath, "utf-8").trim().split("\n");
@@ -61,7 +61,7 @@ test("creates parent directories", () => {
 		session: "s",
 		tier: "local",
 		model: "m",
-		reason: "default",
+		reason: "fallback",
 		latencyMs: 0,
 	});
 	const line = readFileSync(logPath, "utf-8").trim();
