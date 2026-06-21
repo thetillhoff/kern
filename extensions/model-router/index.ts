@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { callOllama } from "./classifier.ts";
+import { callOllama, warmupOllama } from "./classifier.ts";
 import { currentModelId } from "./decision.ts";
 import { appendDecision } from "./logger.ts";
 import {
@@ -63,6 +63,11 @@ function loadConfig(rulesPath: string): RouterConfig {
 	}
 }
 
+// Safety cap on a classifier call kept running for measurement after the gate.
+const CLASSIFIER_SAFETY_MS = 60000;
+// Re-warm the classifier model at most this often while the user types.
+const WARMUP_INTERVAL_MS = 60000;
+
 export default function (pi: ExtensionAPI) {
 	const rulesPath = join(homedir(), ".pi", "model-rules.json");
 	const logPath = join(homedir(), ".pi", "model-decisions.jsonl");
@@ -76,6 +81,7 @@ export default function (pi: ExtensionAPI) {
 		async function setModelByTier(
 			tier: string,
 			reason: "explicit" | "ollama" | "fallback",
+			latencyMs?: number,
 		): Promise<void> {
 			const modelName = config.models?.[tier] ?? config.defaultModel;
 			if (modelName) {
@@ -95,7 +101,7 @@ export default function (pi: ExtensionAPI) {
 				tier,
 				model: modelName ?? "unknown",
 				reason,
-				latencyMs: Date.now() - start,
+				latencyMs: latencyMs ?? Date.now() - start,
 			});
 		}
 
@@ -133,21 +139,44 @@ export default function (pi: ExtensionAPI) {
 			return;
 		}
 
-		// 3. Ollama classifier.
+		// 3. Ollama classifier — gated for routing, but always measured. If the
+		// gate is exceeded we fall back now yet let the call finish in the
+		// background and log how long it would have taken (reason "ollama-late").
 		if (config.ollamaUrl && config.ollamaModel) {
-			const tier = await callOllama(
+			const gateMs = config.classifierTimeoutMs ?? 2000;
+			const classifyP = callOllama(
 				config.ollamaUrl,
 				config.ollamaModel,
 				_event.prompt,
-				config.classifierTimeoutMs ?? 2000,
+				CLASSIFIER_SAFETY_MS,
 			);
-			if (tier) {
-				await setModelByTier(tier, "ollama");
+			const gateP = new Promise<{ gate: true }>((resolve) =>
+				setTimeout(() => resolve({ gate: true }), gateMs),
+			);
+			const winner = await Promise.race([classifyP, gateP]);
+			if ("gate" in winner) {
+				// Gate exceeded: route fallback now, log the late result for eval.
+				const light = config.models?.light ?? config.defaultModel;
+				classifyP
+					.then(({ tier, latencyMs }) => {
+						appendDecision(logPath, {
+							ts: new Date().toISOString(),
+							session,
+							tier: tier ?? "light",
+							model: (tier ? config.models?.[tier] : light) ?? "unknown",
+							reason: "ollama-late",
+							latencyMs,
+						});
+					})
+					.catch(() => {});
+			} else if (winner.tier) {
+				await setModelByTier(winner.tier, "ollama", winner.latencyMs);
 				return;
 			}
+			// else: answered within the gate but no valid tier → fall through.
 		}
 
-		// 4. Fallback to the light model when no classifier answer.
+		// 4. Fallback to the light model.
 		await setModelByTier("light", "fallback");
 	});
 
@@ -159,6 +188,22 @@ export default function (pi: ExtensionAPI) {
 		if (event.source === "set" || event.source === "cycle") {
 			pinSession(session);
 		}
+	});
+
+	// Warm the classifier model as the user starts typing, so the first real
+	// classification isn't a cold load. Throttled to once per WARMUP_INTERVAL_MS.
+	let lastWarmup = 0;
+	pi.on("session_start", (_event, ctx) => {
+		const { ollamaUrl, ollamaModel } = loadConfig(rulesPath);
+		if (!ollamaUrl || !ollamaModel) return;
+		ctx.ui.onTerminalInput(() => {
+			const now = Date.now();
+			if (now - lastWarmup > WARMUP_INTERVAL_MS) {
+				lastWarmup = now;
+				warmupOllama(ollamaUrl, ollamaModel);
+			}
+			return undefined;
+		});
 	});
 
 	pi.registerCommand("ollama", {
