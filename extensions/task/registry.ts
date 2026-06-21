@@ -19,6 +19,7 @@ export function deferred<T>(): Deferred<T> {
 
 export interface ChildEntry {
 	session: AgentSession;
+	runPromise?: Promise<void>;
 	resolveAsk?: (answer: string) => void;
 	questionSignal: Deferred<{ question: string }>;
 	tokensTotal: number;
