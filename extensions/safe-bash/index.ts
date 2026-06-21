@@ -2,7 +2,8 @@ import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { matchesAny } from "./rules.ts";
+import { appendAllowlistPattern } from "./allowlist.ts";
+import { matchesAny, suggestPattern } from "./rules.ts";
 
 interface BashSafetyRules {
 	blocklist: string[];
@@ -44,11 +45,25 @@ export default function (pi: ExtensionAPI) {
 		}
 
 		if (rules.requireConfirmForUnknown) {
-			const ok = await ctx.ui.confirm(
+			const choice = await ctx.ui.select(
 				"Bash approval required",
-				`Allow command:\n\n${command.slice(0, 300)}`,
+				["Allow once", "Allow always", "Deny"],
+				{},
 			);
-			if (!ok) return { block: true, reason: "User denied" };
+			if (choice === "Allow always") {
+				const edited = await ctx.ui.editor(
+					"Allowlist pattern (edit before saving)",
+					suggestPattern(command),
+				);
+				if (edited?.trim()) {
+					appendAllowlistPattern(settingsPath, edited.trim());
+					return; // approved and persisted
+				}
+				return { block: true, reason: "User cancelled allow-always" };
+			}
+			if (choice !== "Allow once") {
+				return { block: true, reason: "User denied" };
+			}
 		}
 	});
 }

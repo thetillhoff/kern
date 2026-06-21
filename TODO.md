@@ -8,33 +8,28 @@ Nothing queued. See Backlog.
 
 ## Done This Session
 
-- **`claude-compat` system prompt injection** - In-place mutation of `event.systemPrompt` was
-  a no-op (runner rebuilds the event per handler from its own `currentSystemPrompt`, applies
-  only the _returned_ `result.systemPrompt` - see `agent-session.js:818`). Now returns
-  `{ systemPrompt }`; `unknown` casts dropped (`event.systemPrompt` is typed `string`).
-- **`task` subagent tool** - New extension. Custom tool (not a slash command) the model
-  orchestrates: spawns a fresh `createAgentSession`, runs `session.prompt()` to completion,
-  returns the last assistant text. Params: `prompt`, optional `model_tier`
-  (light/medium/heavy, reuses model-router's `model-rules.json` map), optional `tools`
-  allowlist. `executionMode: "parallel"` so the model can fan out. Parent abort signal wired
-  to `session.abort()`; `dispose()` in finally. Pi's tool-permission gate handles approve/deny.
-- **Deleted `router/`** - The Python proxy was orphaned: tier-2 classification moved into the
-  `model-router` extension (direct Ollama HTTP), nothing referenced the proxy. Removed the dir
-  and all README references (Docker run, structure tree, dev test command).
-
-- **Smoke test** - All 6 extensions load, model routing works end-to-end with real Pi
-- **`modelRegistry.find()`** - Fixed: `getAll().find(m => m.id === modelName)` (API requires
-  provider + id, workaround replaced)
-- **`BeforeAgentStartEvent` shape** - Fixed: use `event.prompt` directly (not a messages array)
-- **`getBranch()`** - Fixed everywhere: replaced with `getSessionId()` (returns string, not
-  `SessionEntry[]`)
-- **Ollama classifier** - Direct HTTP call to Ollama from model-router, replacing Python router
-  middleman. Configurable via `/ollama` command at runtime
-- **Provider-independent routing** - Tier names (`light`/`medium`/`heavy`) decoupled from model
-  IDs; Bedrock EU model IDs in `~/.pi/model-rules.json`, Anthropic IDs in template
-- **install.sh** - Single `extensions/` dir symlink instead of per-extension symlinks
-- **Type errors** - Fixed across all extensions: fetch mock casts, `skipLibCheck`,
-  `allowImportingTsExtensions`, `noThenProperty` (renamed `then` → `tier` in `RoutingRule`)
+- **`task` subagent escalation** - Rewrote the extension into a continuation engine.
+  `task.execute` no longer awaits the child to completion; it races the child's `prompt()`
+  against a question signal and an optional `timeout_ms`. A subagent calls the new `ask-caller`
+  tool (injected child-only via `customTools`) to ask its caller; `task` returns
+  `awaiting_answer` + the child id to the parent LLM, which answers via a `resume` + `answer`
+  call or escalates with its own `ask-caller`. State lives in a process-shared registry keyed
+  by child `sessionId`. A child `prompt()` rejection/abort or a timeout disposes + deletes the
+  entry exactly once (no leak). Verified live against Bedrock - see `extensions/task/SMOKE.md`.
+- **`task` permission forwarding** - Child UI context is set to the parent's `ctx.ui` via
+  `setUIContext`, so a subagent's `ui.confirm`/`input`/`select` (e.g. `safe-bash`) forwards up
+  the chain to the human at the root.
+- **`task` context inheritance + token accounting** - Child built with a `DefaultResourceLoader`
+  carrying the parent's `getSystemPrompt()` plus a subagent note; skills load from disk. Per
+  segment reads `getSessionStats().tokens`, shows a one-line `setStatus`, and logs to
+  `~/.pi/subagent.jsonl`.
+- **`safe-bash` Allow-always grant** - Replaced the boolean confirm with Allow once / Allow
+  always / Deny. "Allow always" opens an editable suggested glob and appends it to the shared
+  `bashSafety.allowlist` (re-read every `tool_call`, so shared across subagents and persisted);
+  a malformed `settings.json` is never overwritten.
+- **`model-router` logging fixes** - Default branch logs the real session model (not always
+  `defaultModel`); a configured-but-failed Ollama classifier logs `ollama-failed` instead of a
+  silent `default`.
 
 ---
 
@@ -44,11 +39,15 @@ Things worth doing but not blocking immediate use.
 
 ### Pi extensions
 
-- **`task`: live smoke test** - MVP built but only unit-tested (`lastAssistantText`). Verify
-  end-to-end once Pi is running: spawn, model_tier resolution, tool allowlist, parallel calls,
-  abort propagation.
-- **`task`: stream child progress** - Currently silent until the child finishes. Could wire
-  `onUpdate` to surface the subagent's intermediate output in the parent UI.
+- **`task`: depth limit** - Deferred this round. Subagents can spawn subagents with no cap;
+  add a depth budget (injected into the child and decremented per level) to bound recursion.
+- **`task`: full inline child streaming** - A one-line live status (`setStatus`) shipped;
+  surfacing the subagent's full message stream inline in the parent UI is still open.
+- **`task`: orphaned-entry cleanup** - A parent-abort while a child is suspended in
+  `awaiting_answer` (between segments, after `execute` returned) leaks its registry entry. Add
+  a session-scoped sweep or a `session_shutdown` cleanup.
+- **`task`: clear status footer on timeout** - The timeout branch leaves the last token-count
+  `setStatus` line; clear it like the completed/aborted branches do.
 - **`safe-bash`: blocklist wildcards at the start** - Current pattern matching requires the
   wildcard to be at the end (`rm -rf *`). Add support for `*rm -rf*` style patterns.
 - **`model-router`: per-project rules** - Load `.pi/model-rules.json` as a project-level

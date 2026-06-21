@@ -18,3 +18,12 @@ export function matchesAny(command: string, patterns: string[]): boolean {
 		.filter(Boolean);
 	return segments.some((seg) => patterns.some((p) => matchesPattern(seg, p)));
 }
+
+/**
+ * Suggest an allowlist glob for a command: the first token plus " *".
+ * The human edits this before it is stored, so a broad default is fine.
+ */
+export function suggestPattern(command: string): string {
+	const first = command.trim().split(/\s+/)[0] ?? "";
+	return `${first} *`;
+}
