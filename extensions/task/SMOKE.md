@@ -132,3 +132,32 @@ pi -p --no-session "Reply with only: PLAIN_OK"
 `model-decisions.jsonl` shows `reason:"ollama"`/`"fallback"` (NOT `explicit`) -
 the startup model equals the settings default, so the baseline check does not
 mis-pin it and normal routing runs.
+
+### Classifier warmup + latency logging
+
+The classifier model cold-loads slowly (qwen2.5-coder:7b: ~14s cold vs
+~0.5-1.3s warm), while the routing gate is `classifierTimeoutMs` (2000ms). Two
+mitigations:
+
+- **Warmup on typing:** `model-router` registers `ctx.ui.onTerminalInput` in
+  `session_start`; the first keystroke (throttled to once per 60s) fires a
+  fire-and-forget `/api/generate` so the model is warm by submit time.
+- **Always measure:** the 2s gate only bounds *routing*. `callOllama` returns
+  `{tier, latencyMs}` and keeps running (up to a 60s safety cap) when the gate
+  is exceeded; the late result is logged as `reason:"ollama-late"` with its
+  real latency, so evaluation sees how long it would have taken even on a
+  fallback. (In `pi -p` the process may exit before the late call finishes;
+  `ollama-late` is captured in longer-lived interactive sessions.)
+
+Warm verification:
+
+```sh
+curl -s http://localhost:11434/api/generate -d '{"model":"qwen2.5-coder:7b","prompt":"","stream":false}' >/dev/null   # warm
+pi -p --no-session "Design a fault-tolerant distributed queue and explain the tradeoffs"
+```
+
+`model-decisions.jsonl` shows the real classifier latency:
+
+```json
+{"...","tier":"heavy","model":"eu.anthropic.claude-opus-4-6-v1","reason":"ollama","latencyMs":758}
+```
