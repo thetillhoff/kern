@@ -1,11 +1,7 @@
 {
-  "rules": [
-    { "if": { "keywords": ["ls", "grep", "cat", "echo", "pwd", "which", "cd", "find", "touch", "mkdir"] }, "tier": "light" },
-    { "if": { "keywords": ["architecture", "design system", "strategic", "review all", "deep dive", "compare options", "tradeoffs", "research", "think"] }, "tier": "heavy" },
-    { "if": { "tokenCount": { "gt": 8000 } }, "tier": "heavy" }
-  ],
   "ollamaUrl": null,
   "ollamaModel": "qwen3:4b",
+  "classifierTimeoutMs": 2000,
   "defaultModel": "claude-sonnet-4-6",
   "models": {
     "light": "claude-haiku-4-5",
