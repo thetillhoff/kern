@@ -58,6 +58,7 @@ jobs:
           if [ "${{ matrix.tarball }}" = "true" ]; then
             mkdir staging
             mv ${{ matrix.binname }} staging/kern
+            echo '{"name":"kern","version":"'"$VERSION"'"}' > staging/package.json
             cp -r node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/theme staging/theme
             cp -r node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/assets staging/assets
             cp -r node_modules/@earendil-works/pi-coding-agent/dist/core/export-html staging/export-html

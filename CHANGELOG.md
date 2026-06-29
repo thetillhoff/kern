@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.1.2
+
+- Add `-v` as alias for `--version`
+- Bundle `package.json` with correct version in release tarballs so pi's version fallback path also reports the correct version
+
 ## v0.1.1
 
 Fix runtime crash on startup: bundle `theme/`, `assets/`, and `export-html/` directories alongside the binary in release tarballs, and install via a wrapper script that sets `PI_PACKAGE_DIR`.
