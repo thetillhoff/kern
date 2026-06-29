@@ -1,0 +1,80 @@
+name: Release on tag
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+env:
+  TAG: ${{ github.ref_name }}
+
+jobs:
+  release-prerequisites:
+    runs-on: ubuntu-latest
+    outputs:
+      RELEASE_BODY: ${{ steps.release-prerequisites.outputs.RELEASE_BODY }}
+    steps:
+      - id: release-prerequisites
+        uses: thetillhoff/action-release-prerequisites@2798dc58246a51ae1e38f8ecc114d4048e37b0fb # v0.2.0
+        with:
+          RELEASE_TAG: ${{ env.TAG }}
+
+  build:
+    needs: release-prerequisites
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - target: bun-linux-x64
+            artifact: kern_linux_amd64
+          - target: bun-linux-arm64
+            artifact: kern_linux_arm64
+          - target: bun-darwin-x64
+            artifact: kern_darwin_amd64
+          - target: bun-darwin-arm64
+            artifact: kern_darwin_arm64
+          - target: bun-windows-x64
+            artifact: kern_windows_amd64.exe
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+      - run: bun install --frozen-lockfile
+      - run: bun build --compile --minify kern.ts --target ${{ matrix.target }} --outfile ${{ matrix.artifact }}
+      - run: sha256sum ${{ matrix.artifact }} | awk '{print $1}' > ${{ matrix.artifact }}.sha256
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            ${{ matrix.artifact }}
+            ${{ matrix.artifact }}.sha256
+
+  release:
+    needs:
+      - release-prerequisites
+      - build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          merge-multiple: true
+      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        with:
+          body: ${{ needs.release-prerequisites.outputs.RELEASE_BODY }}
+          prerelease: false
+          fail_on_unmatched_files: true
+          files: |
+            kern_*
+            kern_*.sha256
+
+  trigger-homebrew-tap:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger homebrew tap update workflow
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_ACCESS_TOKEN }}
+        run: |
+          gh workflow run update-kern.yml \
+            --repo thetillhoff/homebrew-tap

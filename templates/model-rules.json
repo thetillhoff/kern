@@ -1,0 +1,11 @@
+{
+  "ollamaUrl": null,
+  "ollamaModel": "qwen3:4b",
+  "classifierTimeoutMs": 2000,
+  "defaultModel": "claude-sonnet-4-6",
+  "models": {
+    "light": "claude-haiku-4-5",
+    "medium": "claude-sonnet-4-6",
+    "heavy": "claude-opus-4-8"
+  }
+}

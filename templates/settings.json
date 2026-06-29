@@ -1,0 +1,32 @@
+{
+  "defaultProvider": "anthropic",
+  "defaultModel": "claude-sonnet-4-6",
+  "defaultThinkingLevel": "medium",
+  "compaction": {
+    "enabled": true,
+    "reserveTokens": 16384,
+    "keepRecentTokens": 20000
+  },
+  "bashSafety": {
+    "blocklist": [
+      "rm -rf /",
+      "rm -rf ~",
+      "chmod -R 777 *",
+      ":(){ :|:& };:",
+      "dd if=/dev/zero*",
+      "mkfs*"
+    ],
+    "allowlist": [
+      "git *",
+      "bun *",
+      "npm *",
+      "npx *",
+      "ls *",
+      "cat *",
+      "grep *",
+      "find *",
+      "echo *"
+    ],
+    "requireConfirmForUnknown": true
+  }
+}

@@ -1,0 +1,15 @@
+{
+	"name": "kern",
+	"version": "0.1.0",
+	"type": "module",
+	"scripts": {
+		"build": "bun build --compile --minify kern.ts --outfile kern"
+	},
+	"dependencies": {
+		"@earendil-works/pi-coding-agent": "0.79.8"
+	},
+	"devDependencies": {
+		"bun-types": "^1.3.14",
+		"typescript": "^6.0.3"
+	}
+}
