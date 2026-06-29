@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.1
+
+Fix runtime crash on startup: bundle `theme/`, `assets/`, and `export-html/` directories alongside the binary in release tarballs, and install via a wrapper script that sets `PI_PACKAGE_DIR`.
+
 ## v0.1.0
 
 Initial release. Includes the following extensions:
