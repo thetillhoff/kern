@@ -3,6 +3,11 @@
 // stripped) and could indicate a bypass attempt if stored in the allowlist.
 const SEPARATOR_RE = /&&|\|\||[|;]/;
 
+// Command and process substitution syntax. Segments or patterns containing
+// these are always prompted (never auto-approved via the allowlist) because
+// the inner command is not split out and cannot be independently checked.
+export const SUBST_RE = /\$\(|`|<\(|>\(/;
+
 /**
  * Match a shell command string against a glob pattern.
  * `*` is a wildcard matching any sequence of characters and may appear at any
@@ -30,7 +35,8 @@ export function matchesPattern(command: string, pattern: string): boolean {
  * Rejects patterns containing shell separators.
  */
 export function isValidPattern(pattern: string): boolean {
-	return !SEPARATOR_RE.test(pattern.trim());
+	const t = pattern.trim();
+	return !SEPARATOR_RE.test(t) && !SUBST_RE.test(t);
 }
 
 /**

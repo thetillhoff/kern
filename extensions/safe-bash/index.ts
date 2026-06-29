@@ -7,14 +7,10 @@ import { appendAllowlistPattern } from "./allowlist.ts";
 import {
 	isValidPattern,
 	matchesPattern,
+	SUBST_RE,
 	splitSegments,
 	suggestPattern,
 } from "./rules.ts";
-
-// Matches command substitution syntax. Segments containing $(...) or backticks
-// bypass the allowlist: the inner command is not split out and would never be
-// checked against the blocklist independently.
-const SUBST_RE = /\$\(|`/;
 
 interface BashSafetyRules {
 	blocklist: string[];
@@ -85,7 +81,7 @@ export default function (pi: ExtensionAPI) {
 				}
 				if (!isValidPattern(trimmed)) {
 					ctx.ui.notify(
-						"Pattern contains shell separators (|, &&, ;) — not saved",
+						"Pattern contains shell separators or substitution syntax — not saved",
 						"error",
 					);
 					return { block: true, reason: "Invalid allowlist pattern" };

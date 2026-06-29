@@ -47,6 +47,13 @@ test("isValidPattern rejects separators", () => {
 	expect(isValidPattern("git * || ls")).toBe(false);
 });
 
+test("isValidPattern rejects substitution syntax", () => {
+	expect(isValidPattern("echo $(rm -rf /)")).toBe(false);
+	expect(isValidPattern("echo `rm -rf /`")).toBe(false);
+	expect(isValidPattern("git diff <(cat /etc/passwd)")).toBe(false);
+	expect(isValidPattern("tee >(cat)")).toBe(false);
+});
+
 test("splitSegments splits on every separator", () => {
 	expect(splitSegments("echo abc | cat")).toEqual(["echo abc", "cat"]);
 	expect(splitSegments("a && b || c ; d | e")).toEqual([
