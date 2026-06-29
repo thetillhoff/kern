@@ -27,28 +27,45 @@ jobs:
         include:
           - target: bun-linux-x64
             artifact: kern_linux_amd64
+            tarball: true
           - target: bun-linux-arm64
             artifact: kern_linux_arm64
+            tarball: true
           - target: bun-darwin-x64
             artifact: kern_darwin_amd64
+            tarball: true
           - target: bun-darwin-arm64
             artifact: kern_darwin_arm64
+            tarball: true
           - target: bun-windows-x64
             artifact: kern_windows_amd64.exe
+            tarball: false
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
       - run: bun install --frozen-lockfile
-      - run: bun build --compile --minify kern.ts --target ${{ matrix.target }} --outfile ${{ matrix.artifact }} --define __VERSION__='"'"$VERSION"'"'
+      - name: Build
+        run: bun build --compile --minify kern.ts --target ${{ matrix.target }} --outfile kern_bin --define __VERSION__='"'"$VERSION"'"'
         env:
           VERSION: ${{ env.TAG }}
-      - run: sha256sum ${{ matrix.artifact }} | awk '{print $1}' > ${{ matrix.artifact }}.sha256
+      - name: Package
+        run: |
+          if [ "${{ matrix.tarball }}" = "true" ]; then
+            mkdir staging
+            mv kern_bin staging/kern
+            cp -r node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/theme staging/theme
+            cp -r node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/assets staging/assets
+            cp -r node_modules/@earendil-works/pi-coding-agent/dist/core/export-html staging/export-html
+            tar czf ${{ matrix.artifact }}.tar.gz -C staging .
+            sha256sum ${{ matrix.artifact }}.tar.gz | awk '{print $1}' > ${{ matrix.artifact }}.tar.gz.sha256
+          else
+            mv kern_bin ${{ matrix.artifact }}
+            sha256sum ${{ matrix.artifact }} | awk '{print $1}' > ${{ matrix.artifact }}.sha256
+          fi
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ matrix.artifact }}
-          path: |
-            ${{ matrix.artifact }}
-            ${{ matrix.artifact }}.sha256
+          path: ${{ matrix.artifact }}*
 
   release:
     needs:
@@ -67,8 +84,10 @@ jobs:
           prerelease: false
           fail_on_unmatched_files: true
           files: |
-            kern_*
-            kern_*.sha256
+            kern_*.tar.gz
+            kern_*.tar.gz.sha256
+            kern_windows_amd64.exe
+            kern_windows_amd64.exe.sha256
 
   trigger-homebrew-tap:
     needs: release
