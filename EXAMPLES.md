@@ -26,6 +26,10 @@ on `|`, `||`, `&&`, or `;` gets its own prompt:
 - A segment matching the blocklist blocks the whole command, no prompt.
 - An already-allowlisted segment is skipped silently.
 
+Segments containing command substitution (`$(` or backticks) are always prompted,
+even when the outer command matches an allowlist pattern. The inner command cannot
+be split out and independently checked against the blocklist.
+
 Each prompt offers **Allow once / Allow always / Deny**. "Allow always" opens an
 editable suggested glob (e.g. `echo *`) and appends it to the allowlist, so that
 sub-command - and every later session and subagent - skips the prompt. A grant

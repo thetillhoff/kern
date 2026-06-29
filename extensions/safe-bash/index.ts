@@ -11,6 +11,11 @@ import {
 	suggestPattern,
 } from "./rules.ts";
 
+// Matches command substitution syntax. Segments containing $(...) or backticks
+// bypass the allowlist: the inner command is not split out and would never be
+// checked against the blocklist independently.
+const SUBST_RE = /\$\(|`/;
+
 interface BashSafetyRules {
 	blocklist: string[];
 	allowlist: string[];
@@ -58,7 +63,11 @@ export default function (pi: ExtensionAPI) {
 		const decided = new Set<string>();
 		for (const seg of toCheck) {
 			if (decided.has(seg)) continue; // don't re-prompt an identical segment
-			if (rules.allowlist.some((p) => matchesPattern(seg, p))) continue; // pre-approved (or just allow-always'd)
+			if (
+				!SUBST_RE.test(seg) &&
+				rules.allowlist.some((p) => matchesPattern(seg, p))
+			)
+				continue; // pre-approved (or just allow-always'd)
 
 			const choice = await queuedSelect(
 				ctx.ui,

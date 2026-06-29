@@ -28,6 +28,9 @@ an allowlist of common read-safe commands (`git *`, `bun *`, `npm *`, `npx *`,
    prompt.
 3. If `requireConfirmForUnknown` is false: allow everything not blocked.
 4. For each remaining segment:
+   - If the segment contains command substitution (`$(` or `` ` ``): always prompt,
+     even if a pattern would otherwise match it. Inner commands are not split out
+     and cannot be independently checked against the blocklist.
    - If the segment matches the allowlist: skip silently.
    - Otherwise: prompt the user with **Allow once / Allow always / Deny**.
      - **Allow always**: open an editable text field pre-populated with a
