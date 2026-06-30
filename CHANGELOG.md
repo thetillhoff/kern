@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.10
+
+- Honour `ANTHROPIC_MODEL` env var: inject `--model <value>` unless `--model` already passed on the CLI. Fixes "invalid model identifier" when using Bedrock with a non-default region prefix (e.g. `eu.anthropic.*`).
+
 ## v0.1.9
 
 - Fix Bedrock crash after prompt authentication: statically import `bedrock-provider` so bun bundles it (was missing from compiled binary, causing `Cannot find module './amazon-bedrock.js'`)

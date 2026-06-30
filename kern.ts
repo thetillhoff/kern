@@ -18,8 +18,16 @@ if (process.argv[2] === "--version" || process.argv[2] === "-v") {
 	process.exit(0);
 }
 
+const cliArgs = process.argv.slice(2);
 
-await main(process.argv.slice(2), {
+// Honour Claude Code env vars that pi doesn't natively understand.
+// Inject --model <ANTHROPIC_MODEL> unless the caller already passed --model.
+const anthropicModel = process.env.ANTHROPIC_MODEL;
+if (anthropicModel && !cliArgs.includes("--model")) {
+	cliArgs.unshift("--model", anthropicModel);
+}
+
+await main(cliArgs, {
 	extensionFactories: [
 		claudeCompat,
 		contextManager,
