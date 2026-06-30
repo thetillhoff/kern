@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.8
+
+- Suppress skill conflict warnings: skip plugin skills dirs whose skill names are already claimed by user or project skills
+
 ## v0.1.7
 
 - Suppress "skill path does not exist" warnings for Claude Code plugins that don't ship a `skills/` directory

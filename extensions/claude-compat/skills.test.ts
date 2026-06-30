@@ -99,6 +99,29 @@ test("skips plugin if skills/ dir does not exist", () => {
 	expect(paths).not.toContain(join(pluginInstallPath, "skills"));
 });
 
+test("skips plugin skills dir if any skill name conflicts with user skills", () => {
+	const cwd = makeTmp();
+	const claudeDir = makeTmp();
+	const pluginsDir = join(claudeDir, "plugins");
+	mkdirSync(pluginsDir, { recursive: true });
+
+	// User skill named "my-skill"
+	mkdirSync(join(claudeDir, "skills", "my-skill"), { recursive: true });
+
+	// Plugin has "my-skill" (conflict) and another skill
+	const pluginPath = join(claudeDir, "cache", "myplugin", "1.0.0");
+	mkdirSync(join(pluginPath, "skills", "my-skill"), { recursive: true });
+	mkdirSync(join(pluginPath, "skills", "other-skill"), { recursive: true });
+
+	const installed = {
+		plugins: { "myplugin@m": [{ installPath: pluginPath }] },
+	};
+	writeFileSync(join(pluginsDir, "installed_plugins.json"), JSON.stringify(installed));
+
+	const paths = claudeSkillPaths(cwd, claudeDir);
+	expect(paths).not.toContain(join(pluginPath, "skills"));
+});
+
 test("ignores malformed installed_plugins.json", () => {
 	const cwd = makeTmp();
 	const claudeDir = makeTmp();
