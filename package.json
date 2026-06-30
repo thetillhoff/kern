@@ -2,6 +2,10 @@
 	"name": "kern",
 	"version": "0.1.0",
 	"type": "module",
+	"piConfig": {
+		"name": "kern",
+		"configDir": ".kern"
+	},
 	"scripts": {
 		"build": "bun build --compile --minify kern.ts --outfile kern"
 	},

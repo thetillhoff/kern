@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.1.3
+
+- UI shows `kern` instead of `π / pi` (via `piConfig.name` in package.json)
+- Config dir defaults to `~/.kern/agent`; falls back to `~/.pi/agent` if it exists (migration path), or `~/.claude/kern` if it exists
+
 ## v0.1.2
 
 - Add `-v` as alias for `--version`
