@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.5
+
+- Fix extension conflict errors when pi is installed in parallel: kern now always uses `~/.kern/agent` (no fallback to `~/.pi/agent`). Set `KERN_CODING_AGENT_DIR` to override.
+
 ## v0.1.4
 
 - `bun run build` compiles to `dist/` with all runtime assets staged
