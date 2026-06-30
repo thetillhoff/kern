@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.9
+
+- Fix Bedrock crash after prompt authentication: statically import `bedrock-provider` so bun bundles it (was missing from compiled binary, causing `Cannot find module './amazon-bedrock.js'`)
+
 ## v0.1.8
 
 - Suppress skill conflict warnings: skip plugin skills dirs whose skill names are already claimed by user or project skills

@@ -1,4 +1,7 @@
 import { main } from "@earendil-works/pi-coding-agent";
+import { setBedrockProviderModule } from "@earendil-works/pi-ai";
+import { bedrockProviderModule } from "@earendil-works/pi-ai/bedrock-provider";
+setBedrockProviderModule(bedrockProviderModule);
 import claudeCompat from "./extensions/claude-compat/index.ts";
 import contextManager from "./extensions/context-manager/index.ts";
 import fetchUrl from "./extensions/fetch-url/index.ts";
