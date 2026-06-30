@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.4
+
+- `bun run build` compiles to `dist/` with all runtime assets staged
+- `bun run verify` smoke-tests the local binary before tagging
+- Add `*.bun-build` and `dist/` to `.gitignore`
+
 ## v0.1.3
 
 - UI shows `kern` instead of `π / pi` (via `piConfig.name` in package.json)
