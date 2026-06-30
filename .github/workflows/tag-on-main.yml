@@ -1,0 +1,93 @@
+name: Automatically create patch releases when renovate merges a PR to main
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  determine-version:
+    runs-on: ubuntu-latest
+    if: ${{ github.actor == 'renovate[bot]' }}
+    outputs:
+      CURRENT_VERSION: ${{ steps.versions.outputs.CURRENT_VERSION }}
+      NEW_VERSION: ${{ steps.versions.outputs.NEW_VERSION }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - id: versions
+        run: |
+          CURRENT_VERSION=$(git describe --tags --abbrev=0)
+          NEW_VERSION=v$(npx semver "$CURRENT_VERSION" -i patch)
+
+          echo "CURRENT_VERSION=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+  update-changelog:
+    needs: determine-version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Update CHANGELOG
+        env:
+          NEW_VERSION: ${{ needs.determine-version.outputs.NEW_VERSION }}
+          CURRENT_VERSION: ${{ needs.determine-version.outputs.CURRENT_VERSION }}
+        run: |
+          grep -q "^## ${CURRENT_VERSION}" CHANGELOG.md
+          FIRST_VERSION_LINE_NUMBER=$(grep -n "^## ${CURRENT_VERSION}" CHANGELOG.md | head -1 | cut -d: -f1)
+          sed -i "${FIRST_VERSION_LINE_NUMBER}i\## ${NEW_VERSION}\n\nUpdated dependencies.\n" CHANGELOG.md
+
+      - name: Commit and push CHANGELOG
+        env:
+          NEW_VERSION: ${{ needs.determine-version.outputs.NEW_VERSION }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git commit -m "Add CHANGELOG entry for ${NEW_VERSION}"
+          git push
+
+  verify-build:
+    needs: determine-version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+      - run: bun install --frozen-lockfile
+      - name: Build
+        env:
+          VERSION: ${{ needs.determine-version.outputs.NEW_VERSION }}
+        run: bun build --compile --minify kern.ts --target bun-linux-x64 --outfile kern_linux_amd64 --define __VERSION__='"'"$VERSION"'"'
+      - name: Verify version
+        env:
+          EXPECTED_VERSION: ${{ needs.determine-version.outputs.NEW_VERSION }}
+        run: |
+          VERSION_OUTPUT=$(./kern_linux_amd64 --version 2>&1)
+          if [[ "$VERSION_OUTPUT" != "$EXPECTED_VERSION" ]]; then
+            echo "ERROR: Version mismatch! Expected: '$EXPECTED_VERSION', Got: '$VERSION_OUTPUT'"
+            exit 1
+          fi
+          echo "✓ Version verification passed: $VERSION_OUTPUT"
+
+  git-tag:
+    needs:
+      - determine-version
+      - update-changelog
+      - verify-build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Pull latest changes and create tag
+        env:
+          NEW_VERSION: ${{ needs.determine-version.outputs.NEW_VERSION }}
+        run: |
+          git pull origin main
+          git tag "$NEW_VERSION"
+          git push origin "$NEW_VERSION"
