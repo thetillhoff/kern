@@ -7,7 +7,8 @@
 		"configDir": ".kern"
 	},
 	"scripts": {
-		"build": "bun build --compile --minify kern.ts --outfile kern"
+		"build": "bun build --compile --minify kern.ts --outfile dist/kern --define __VERSION__='\"dev\"' && cp -r node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/theme dist/theme && cp -r node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/assets dist/assets && cp -r node_modules/@earendil-works/pi-coding-agent/dist/core/export-html dist/export-html && node -e \"const p=require('./package.json');delete p.scripts;require('fs').writeFileSync('dist/package.json',JSON.stringify(p,null,2))\"",
+		"verify": "PI_PACKAGE_DIR=$(pwd)/dist dist/kern --version && PI_PACKAGE_DIR=$(pwd)/dist dist/kern --help 2>&1 | head -3"
 	},
 	"dependencies": {
 		"@earendil-works/pi-coding-agent": "0.79.8"
