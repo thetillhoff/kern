@@ -37,7 +37,7 @@ test("reads plugin skill paths from installed_plugins.json", () => {
 	mkdirSync(pluginsDir, { recursive: true });
 
 	const pluginInstallPath = join(claudeDir, "cache", "myplugin", "1.0.0");
-	mkdirSync(pluginInstallPath, { recursive: true });
+	mkdirSync(join(pluginInstallPath, "skills"), { recursive: true });
 
 	const installed = {
 		version: 2,
@@ -62,8 +62,8 @@ test("includes all plugin entries", () => {
 
 	const pathA = join(claudeDir, "cache", "pluginA", "1.0.0");
 	const pathB = join(claudeDir, "cache", "pluginB", "2.0.0");
-	mkdirSync(pathA, { recursive: true });
-	mkdirSync(pathB, { recursive: true });
+	mkdirSync(join(pathA, "skills"), { recursive: true });
+	mkdirSync(join(pathB, "skills"), { recursive: true });
 
 	const installed = {
 		plugins: {
@@ -79,6 +79,24 @@ test("includes all plugin entries", () => {
 	const paths = claudeSkillPaths(cwd, claudeDir);
 	expect(paths).toContain(join(pathA, "skills"));
 	expect(paths).toContain(join(pathB, "skills"));
+});
+
+test("skips plugin if skills/ dir does not exist", () => {
+	const cwd = makeTmp();
+	const claudeDir = makeTmp();
+	const pluginsDir = join(claudeDir, "plugins");
+	mkdirSync(pluginsDir, { recursive: true });
+
+	const pluginInstallPath = join(claudeDir, "cache", "myplugin", "1.0.0");
+	mkdirSync(pluginInstallPath, { recursive: true }); // installPath exists, but no skills/ inside
+
+	const installed = {
+		plugins: { "myplugin@m": [{ installPath: pluginInstallPath }] },
+	};
+	writeFileSync(join(pluginsDir, "installed_plugins.json"), JSON.stringify(installed));
+
+	const paths = claudeSkillPaths(cwd, claudeDir);
+	expect(paths).not.toContain(join(pluginInstallPath, "skills"));
 });
 
 test("ignores malformed installed_plugins.json", () => {

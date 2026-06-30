@@ -32,7 +32,10 @@ export function claudeSkillPaths(
 			);
 			for (const entries of Object.values(data.plugins ?? {})) {
 				for (const entry of entries) {
-					paths.push(join(entry.installPath, "skills"));
+					const skillsDir = join(entry.installPath, "skills");
+					if (existsSync(skillsDir)) {
+						paths.push(skillsDir);
+					}
 				}
 			}
 		} catch {

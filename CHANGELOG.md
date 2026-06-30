@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.7
+
+- Suppress "skill path does not exist" warnings for Claude Code plugins that don't ship a `skills/` directory
+
 ## v0.1.6
 
 - Fix `kern v0.0.0` in UI: pass `VERSION` env to Package step so `package.json` in tarball gets the correct version
