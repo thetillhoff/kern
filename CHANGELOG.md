@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.1.6
+
+- Fix `kern v0.0.0` in UI: pass `VERSION` env to Package step so `package.json` in tarball gets the correct version
+- Suppress pi.dev update nag in Homebrew install (`PI_SKIP_VERSION_CHECK=1` in wrapper script)
+
 ## v0.1.5
 
 - Fix extension conflict errors when pi is installed in parallel: kern now always uses `~/.kern/agent` (no fallback to `~/.pi/agent`). Set `KERN_CODING_AGENT_DIR` to override.

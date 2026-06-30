@@ -54,6 +54,8 @@ jobs:
         env:
           VERSION: ${{ env.TAG }}
       - name: Package
+        env:
+          VERSION: ${{ env.TAG }}
         run: |
           if [ "${{ matrix.tarball }}" = "true" ]; then
             mkdir staging
