@@ -3,6 +3,7 @@
 ## v0.1.13
 
 - Fix cwd normalization in `safe-bash`: paths under the working directory are rewritten to `./…` before allowlist checks, so patterns like `ls ./*` match across subdirectories
+- Fix `~/`-prefixed paths also normalized to `./` when under cwd
 
 ## v0.1.12
 
