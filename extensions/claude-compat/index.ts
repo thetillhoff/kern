@@ -8,6 +8,15 @@ export default function (pi: ExtensionAPI) {
 	const globalPiDir = join(homedir(), ".pi");
 	const globalClaudeDir = join(homedir(), ".claude");
 
+	// /clear: start a fresh session, discarding all history and context.
+	// Mirrors the /clear command in Claude Code.
+	pi.registerCommand("clear", {
+		description: "Clear conversation history and start a fresh session",
+		handler: async (_args, ctx) => {
+			await ctx.newSession();
+		},
+	});
+
 	pi.on("before_agent_start", async (event, ctx) => {
 		// globalClaudeDir intentionally omitted: loader.ts skips ~/.claude/CLAUDE.md
 		// when no directory is provided, preventing Claude Code harness config injection.

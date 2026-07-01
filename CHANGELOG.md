@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.12
+
+- Add `/clear` command to `claude-compat` extension: starts a fresh session, discarding all conversation history and context. Mirrors `/clear` in Claude Code.
+
 ## v0.1.11
 
 - Rename "Allow always" to "Allow always…" in bash approval prompt to signal a follow-up editor step
