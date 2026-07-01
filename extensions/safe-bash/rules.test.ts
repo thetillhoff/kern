@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import {
 	isValidPattern,
 	matchesPattern,
+	normalizePaths,
 	splitSegments,
 	suggestPattern,
 } from "./rules.ts";
@@ -135,6 +136,53 @@ test("splitSegments: && inside quotes does not split", () => {
 	expect(splitSegments('echo "hello && world"')).toEqual([
 		'echo "hello && world"',
 	]);
+});
+
+// normalizePaths
+
+test("normalizePaths: /home/user/ prefix → ~/", () => {
+	expect(normalizePaths("ls /home/alice/projects", "/home/alice")).toBe(
+		"ls ~/projects",
+	);
+});
+
+test("normalizePaths: /Users/user/ prefix → ~/", () => {
+	expect(normalizePaths("ls /Users/alice/projects", "/Users/alice")).toBe(
+		"ls ~/projects",
+	);
+});
+
+test("normalizePaths: $HOME/ → ~/", () => {
+	expect(normalizePaths("ls $HOME/projects", "/home/alice")).toBe(
+		"ls ~/projects",
+	);
+});
+
+test("normalizePaths: already ~ → unchanged", () => {
+	expect(normalizePaths("ls ~/projects", "/home/alice")).toBe("ls ~/projects");
+});
+
+test("normalizePaths: multiple occurrences all rewritten", () => {
+	expect(
+		normalizePaths(
+			"cp /home/alice/a.txt /home/alice/b.txt",
+			"/home/alice",
+		),
+	).toBe("cp ~/a.txt ~/b.txt");
+});
+
+test("normalizePaths: path not under home → unchanged", () => {
+	expect(normalizePaths("ls /etc/passwd", "/home/alice")).toBe(
+		"ls /etc/passwd",
+	);
+});
+
+test("normalizePaths: home as exact arg (no trailing slash) → ~", () => {
+	expect(normalizePaths("ls /home/alice", "/home/alice")).toBe("ls ~");
+});
+
+test("normalizePaths: empty home → unchanged", () => {
+	expect(normalizePaths("ls /home/alice/foo", "")).toBe("ls /home/alice/foo");
 });
 
 test("suggestPattern globs the first token", () => {

@@ -7,6 +7,7 @@ import { appendAllowlistPattern } from "./allowlist.ts";
 import {
 	isValidPattern,
 	matchesPattern,
+	normalizePaths,
 	SUBST_RE,
 	splitSegments,
 	suggestPattern,
@@ -35,12 +36,15 @@ function loadRules(settingsPath: string): BashSafetyRules {
 
 export default function (pi: ExtensionAPI) {
 	const settingsPath = join(homedir(), ".pi", "agent", "settings.json");
+	const home = homedir();
 	const rules = loadRules(settingsPath);
 
 	pi.on("tool_call", async (event, ctx) => {
 		if (event.toolName !== "bash") return;
-		const command: string =
-			(event.input as { command?: string })?.command ?? "";
+		const input = event.input as { command?: string };
+		const raw: string = input?.command ?? "";
+		const command = normalizePaths(raw, home);
+		if (command !== raw) input.command = command; // rewrite so Pi executes normalized form
 
 		// Each piped/chained sub-command is approved on its own, one prompt at a
 		// time. A single segment matching the blocklist blocks the whole command.

@@ -103,6 +103,21 @@ export function splitSegments(command: string): string[] | null {
 }
 
 /**
+ * Rewrite absolute home-directory paths to `~/…` so allowlist patterns are
+ * username-independent. Replaces `/home/<user>/` and `/Users/<user>/` prefixes
+ * (and their `$HOME/` equivalent) with `~/`. Only rewrites outside of quotes
+ * so it cannot be exploited to collapse a quoted string argument.
+ */
+export function normalizePaths(command: string, home: string): string {
+	if (!home) return command;
+	// Normalize $HOME → literal home first (covers $HOME/foo → /home/user/foo → ~/foo)
+	const withLiteral = command.replace(/\$HOME(?=\/|$)/g, home);
+	// Escape home for use in regex (handles spaces or special chars in path)
+	const escaped = home.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	return withLiteral.replace(new RegExp(`${escaped}(?=/|$)`, "g"), "~");
+}
+
+/**
  * Suggest an allowlist glob for a command: the first token plus " *".
  * The human edits this before it is stored, so a broad default is fine.
  * For bare commands (single word), return the exact command without " *".

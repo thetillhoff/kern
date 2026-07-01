@@ -4,6 +4,7 @@
 
 - Rename "Allow always" to "Allow always…" in bash approval prompt to signal a follow-up editor step
 - Fix quote-aware `splitSegments`: `|`/`&&`/`||`/`;` inside single or double quotes no longer split into separate segments; unmatched quotes block the command rather than risking hidden segment injection
+- Normalize absolute home paths (`/home/<user>/`, `/Users/<user>/`, `$HOME/`) to `~/` before allowlist checks and prompt display, so allowlist patterns are username-independent
 
 ## v0.1.10
 
