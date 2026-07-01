@@ -73,6 +73,70 @@ test("splitSegments returns single segment when no separators", () => {
 	expect(splitSegments("git status")).toEqual(["git status"]);
 });
 
+// quote-aware splitting
+
+test("splitSegments: double-quoted | is not a separator", () => {
+	expect(splitSegments('grep -E "foo|bar" file')).toEqual([
+		'grep -E "foo|bar" file',
+	]);
+});
+
+test("splitSegments: single-quoted | is not a separator", () => {
+	expect(splitSegments("grep -E 'foo|bar' file")).toEqual([
+		"grep -E 'foo|bar' file",
+	]);
+});
+
+test("splitSegments: BRE \\| inside double quotes is not a separator", () => {
+	expect(splitSegments('grep "foo\\|bar" file')).toEqual([
+		'grep "foo\\|bar" file',
+	]);
+});
+
+test("splitSegments: unquoted | after backslash-escaped quote splits correctly", () => {
+	// cmd arg\" | rm -rf / — exploit case: \" is a literal quote char, not opening a string
+	expect(splitSegments('cmd arg\\" | rm -rf /')).toEqual([
+		'cmd arg\\"',
+		"rm -rf /",
+	]);
+});
+
+test("splitSegments: unmatched double quote returns null (block)", () => {
+	// Unmatched quote → could hide segments via quote-state exploit
+	expect(splitSegments('cmd "foo | rm -rf /')).toBeNull();
+});
+
+test("splitSegments: unmatched single quote returns null (block)", () => {
+	expect(splitSegments("cmd 'foo | rm -rf /")).toBeNull();
+});
+
+test("splitSegments: properly closed quotes then unquoted pipe splits", () => {
+	// echo 'it'\''s' | cat — single-quoted with escaped apostrophe
+	expect(splitSegments("echo 'it'\\''s' | cat")).toEqual([
+		"echo 'it'\\''s'",
+		"cat",
+	]);
+});
+
+test("splitSegments: escaped double quote inside double quotes stays in string", () => {
+	expect(splitSegments('echo "say \\"hi\\" | cat"')).toEqual([
+		'echo "say \\"hi\\" | cat"',
+	]);
+});
+
+test("splitSegments: && outside quotes splits", () => {
+	expect(splitSegments('echo "hello" && rm -rf /')).toEqual([
+		'echo "hello"',
+		"rm -rf /",
+	]);
+});
+
+test("splitSegments: && inside quotes does not split", () => {
+	expect(splitSegments('echo "hello && world"')).toEqual([
+		'echo "hello && world"',
+	]);
+});
+
 test("suggestPattern globs the first token", () => {
 	expect(suggestPattern("git push origin main")).toBe("git *");
 	expect(suggestPattern("  rm -rf foo  ")).toBe("rm *");

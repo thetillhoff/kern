@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.1.11
+
+- Rename "Allow always" to "Allow always…" in bash approval prompt to signal a follow-up editor step
+- Fix quote-aware `splitSegments`: `|`/`&&`/`||`/`;` inside single or double quotes no longer split into separate segments; unmatched quotes block the command rather than risking hidden segment injection
+
 ## v0.1.10
 
 - Honour `ANTHROPIC_MODEL` env var: inject `--model <value>` unless `--model` already passed on the CLI. Fixes "invalid model identifier" when using Bedrock with a non-default region prefix (e.g. `eu.anthropic.*`).

@@ -45,11 +45,61 @@ export function isValidPattern(pattern: string): boolean {
  * not two empty splits. Each sub-command is approved/blocked on its own, so
  * `rm -rf / && ls` cannot ride in on a whole-string pattern.
  */
-export function splitSegments(command: string): string[] {
-	return command
-		.split(/&&|\|\||;|\|/)
-		.map((s) => s.trim())
-		.filter(Boolean);
+// Returns null when the command contains an unmatched quote — caller must block.
+export function splitSegments(command: string): string[] | null {
+	const segments: string[] = [];
+	let current = "";
+	let inSingle = false;
+	let inDouble = false;
+
+	for (let i = 0; i < command.length; i++) {
+		const ch = command[i];
+
+		if (inSingle) {
+			// No escapes inside single quotes (bash spec)
+			if (ch === "'") inSingle = false;
+			current += ch;
+		} else if (inDouble) {
+			if (ch === "\\" && i + 1 < command.length) {
+				// consume next char as literal (covers \" staying in double-quote state)
+				current += ch + command[++i];
+			} else if (ch === '"') {
+				inDouble = false;
+				current += ch;
+			} else {
+				current += ch;
+			}
+		} else {
+			// unquoted
+			if (ch === "\\" && i + 1 < command.length) {
+				// backslash escapes next char — stays unquoted, does NOT open a string
+				current += ch + command[++i];
+			} else if (ch === "'") {
+				inSingle = true;
+				current += ch;
+			} else if (ch === '"') {
+				inDouble = true;
+				current += ch;
+			} else {
+				const two = command.slice(i, i + 2);
+				if (two === "&&" || two === "||") {
+					segments.push(current.trim());
+					current = "";
+					i++;
+				} else if (ch === "|" || ch === ";") {
+					segments.push(current.trim());
+					current = "";
+				} else {
+					current += ch;
+				}
+			}
+		}
+	}
+
+	if (inSingle || inDouble) return null; // unmatched quote — block
+
+	if (current.trim()) segments.push(current.trim());
+	return segments.filter(Boolean);
 }
 
 /**
