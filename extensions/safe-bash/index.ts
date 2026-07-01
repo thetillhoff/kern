@@ -45,6 +45,10 @@ export default function (pi: ExtensionAPI) {
 		// Each piped/chained sub-command is approved on its own, one prompt at a
 		// time. A single segment matching the blocklist blocks the whole command.
 		const segments = splitSegments(command);
+		if (segments === null) {
+			ctx.ui.notify("Blocked: unmatched quote in command", "error");
+			return { block: true, reason: "Unmatched quote — possible injection attempt" };
+		}
 		const toCheck = segments.length ? segments : [command.trim()];
 
 		for (const seg of toCheck) {
@@ -68,9 +72,9 @@ export default function (pi: ExtensionAPI) {
 			const choice = await queuedSelect(
 				ctx.ui,
 				`Bash approval required: ${seg.slice(0, 80)}`,
-				["Allow once", "Allow always", "Deny"],
+				["Allow once", "Allow always…", "Deny"],
 			);
-			if (choice === "Allow always") {
+			if (choice === "Allow always…") {
 				const edited = await ctx.ui.editor(
 					"Allowlist pattern (edit before saving)",
 					suggestPattern(seg),
