@@ -93,7 +93,10 @@ test("skips plugin if skills/ dir does not exist", () => {
 	const installed = {
 		plugins: { "myplugin@m": [{ installPath: pluginInstallPath }] },
 	};
-	writeFileSync(join(pluginsDir, "installed_plugins.json"), JSON.stringify(installed));
+	writeFileSync(
+		join(pluginsDir, "installed_plugins.json"),
+		JSON.stringify(installed),
+	);
 
 	const paths = claudeSkillPaths(cwd, claudeDir);
 	expect(paths).not.toContain(join(pluginInstallPath, "skills"));
@@ -116,7 +119,10 @@ test("skips plugin skills dir if any skill name conflicts with user skills", () 
 	const installed = {
 		plugins: { "myplugin@m": [{ installPath: pluginPath }] },
 	};
-	writeFileSync(join(pluginsDir, "installed_plugins.json"), JSON.stringify(installed));
+	writeFileSync(
+		join(pluginsDir, "installed_plugins.json"),
+		JSON.stringify(installed),
+	);
 
 	const paths = claudeSkillPaths(cwd, claudeDir);
 	expect(paths).not.toContain(join(pluginPath, "skills"));
