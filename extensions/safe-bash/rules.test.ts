@@ -232,6 +232,32 @@ test("normalizePaths: no cwd provided → only home normalization", () => {
 	);
 });
 
+test("normalizePaths: ~/subdir rewritten to ./ when under cwd", () => {
+	expect(
+		normalizePaths(
+			"ls ~/code/myproject/src",
+			"/home/alice",
+			"/home/alice/code/myproject",
+		),
+	).toBe("ls ./src");
+});
+
+test("normalizePaths: ~/other not under cwd stays ~/other", () => {
+	expect(
+		normalizePaths(
+			"ls ~/other",
+			"/home/alice",
+			"/home/alice/code/myproject",
+		),
+	).toBe("ls ~/other");
+});
+
+test("normalizePaths: ~ alone (exact cwd) → .", () => {
+	expect(
+		normalizePaths("ls ~", "/home/alice", "/home/alice"),
+	).toBe("ls .");
+});
+
 test("suggestPattern globs the first token", () => {
 	expect(suggestPattern("git push origin main")).toBe("git *");
 	expect(suggestPattern("  rm -rf foo  ")).toBe("rm *");

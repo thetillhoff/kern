@@ -114,10 +114,13 @@ export function normalizePaths(
 	cwd?: string,
 ): string {
 	if (!home) return command;
-	// Normalize $HOME → literal home first (covers $HOME/foo → ~/foo)
-	const withLiteral = command.replace(/\$HOME(?=\/|$)/g, home);
+	// Expand $HOME and ~/ to literal home so cwd matching works on a canonical path
+	const expanded = command
+		.replace(/\$HOME(?=\/|$)/g, home)
+		.replace(/^~(?=\/|$)/, home)
+		.replace(/ ~(?=\/|$)/g, ` ${home}`);
 	// Replace cwd prefix before home prefix (cwd is more specific)
-	let result = withLiteral;
+	let result = expanded;
 	if (cwd) {
 		const escapedCwd = cwd.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 		result = result.replace(new RegExp(`${escapedCwd}(?=/|$)`, "g"), ".");
