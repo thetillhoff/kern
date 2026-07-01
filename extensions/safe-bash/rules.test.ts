@@ -185,6 +185,53 @@ test("normalizePaths: empty home → unchanged", () => {
 	expect(normalizePaths("ls /home/alice/foo", "")).toBe("ls /home/alice/foo");
 });
 
+test("normalizePaths: cwd prefix → ./", () => {
+	expect(
+		normalizePaths(
+			"ls /home/alice/code/myproject/src",
+			"/home/alice",
+			"/home/alice/code/myproject",
+		),
+	).toBe("ls ./src");
+});
+
+test("normalizePaths: cwd exact match → .", () => {
+	expect(
+		normalizePaths(
+			"ls /home/alice/code/myproject",
+			"/home/alice",
+			"/home/alice/code/myproject",
+		),
+	).toBe("ls .");
+});
+
+test("normalizePaths: cwd rewrite takes priority over home rewrite", () => {
+	// cwd is under home — should become ./, not ~/code/myproject/src
+	expect(
+		normalizePaths(
+			"ls /home/alice/code/myproject/src",
+			"/home/alice",
+			"/home/alice/code/myproject",
+		),
+	).toBe("ls ./src");
+});
+
+test("normalizePaths: path outside cwd but under home → ~/", () => {
+	expect(
+		normalizePaths(
+			"ls /home/alice/other",
+			"/home/alice",
+			"/home/alice/code/myproject",
+		),
+	).toBe("ls ~/other");
+});
+
+test("normalizePaths: no cwd provided → only home normalization", () => {
+	expect(normalizePaths("ls /home/alice/src", "/home/alice")).toBe(
+		"ls ~/src",
+	);
+});
+
 test("suggestPattern globs the first token", () => {
 	expect(suggestPattern("git push origin main")).toBe("git *");
 	expect(suggestPattern("  rm -rf foo  ")).toBe("rm *");

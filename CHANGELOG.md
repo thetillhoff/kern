@@ -3,6 +3,7 @@
 ## v0.1.12
 
 - Add `/clear` command to `claude-compat` extension: starts a fresh session, discarding all conversation history and context. Mirrors `/clear` in Claude Code.
+- Fix cwd normalization in `safe-bash`: paths under the working directory are rewritten to `./…` before allowlist checks, so patterns like `ls ./*` match across subdirectories
 
 ## v0.1.11
 

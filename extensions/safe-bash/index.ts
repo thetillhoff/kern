@@ -37,13 +37,14 @@ function loadRules(settingsPath: string): BashSafetyRules {
 export default function (pi: ExtensionAPI) {
 	const settingsPath = join(homedir(), ".pi", "agent", "settings.json");
 	const home = homedir();
+	const cwd = process.cwd();
 	const rules = loadRules(settingsPath);
 
 	pi.on("tool_call", async (event, ctx) => {
 		if (event.toolName !== "bash") return;
 		const input = event.input as { command?: string };
 		const raw: string = input?.command ?? "";
-		const command = normalizePaths(raw, home);
+		const command = normalizePaths(raw, home, cwd);
 		if (command !== raw) input.command = command; // rewrite so Pi executes normalized form
 
 		// Each piped/chained sub-command is approved on its own, one prompt at a

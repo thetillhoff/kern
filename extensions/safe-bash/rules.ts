@@ -108,13 +108,22 @@ export function splitSegments(command: string): string[] | null {
  * (and their `$HOME/` equivalent) with `~/`. Only rewrites outside of quotes
  * so it cannot be exploited to collapse a quoted string argument.
  */
-export function normalizePaths(command: string, home: string): string {
+export function normalizePaths(
+	command: string,
+	home: string,
+	cwd?: string,
+): string {
 	if (!home) return command;
-	// Normalize $HOME → literal home first (covers $HOME/foo → /home/user/foo → ~/foo)
+	// Normalize $HOME → literal home first (covers $HOME/foo → ~/foo)
 	const withLiteral = command.replace(/\$HOME(?=\/|$)/g, home);
-	// Escape home for use in regex (handles spaces or special chars in path)
-	const escaped = home.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-	return withLiteral.replace(new RegExp(`${escaped}(?=/|$)`, "g"), "~");
+	// Replace cwd prefix before home prefix (cwd is more specific)
+	let result = withLiteral;
+	if (cwd) {
+		const escapedCwd = cwd.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+		result = result.replace(new RegExp(`${escapedCwd}(?=/|$)`, "g"), ".");
+	}
+	const escapedHome = home.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	return result.replace(new RegExp(`${escapedHome}(?=/|$)`, "g"), "~");
 }
 
 /**
