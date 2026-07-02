@@ -1,3 +1,8 @@
+---
+name: kern-release
+description: Monitor a kern release after pushing a tag — checks CI, release artifacts, and homebrew-tap update in sequence.
+---
+
 # kern-release
 
 Use when waiting for a kern release to complete after pushing a tag — monitors CI, release build, and homebrew-tap update in sequence.
