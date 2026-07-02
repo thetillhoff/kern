@@ -52,7 +52,10 @@ export default function (pi: ExtensionAPI) {
 		const segments = splitSegments(command);
 		if (segments === null) {
 			ctx.ui.notify("Blocked: unmatched quote in command", "error");
-			return { block: true, reason: "Unmatched quote — possible injection attempt" };
+			return {
+				block: true,
+				reason: "Unmatched quote — possible injection attempt",
+			};
 		}
 		const toCheck = segments.length ? segments : [command.trim()];
 

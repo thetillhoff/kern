@@ -164,10 +164,7 @@ test("normalizePaths: already ~ → unchanged", () => {
 
 test("normalizePaths: multiple occurrences all rewritten", () => {
 	expect(
-		normalizePaths(
-			"cp /home/alice/a.txt /home/alice/b.txt",
-			"/home/alice",
-		),
+		normalizePaths("cp /home/alice/a.txt /home/alice/b.txt", "/home/alice"),
 	).toBe("cp ~/a.txt ~/b.txt");
 });
 
@@ -227,9 +224,7 @@ test("normalizePaths: path outside cwd but under home → ~/", () => {
 });
 
 test("normalizePaths: no cwd provided → only home normalization", () => {
-	expect(normalizePaths("ls /home/alice/src", "/home/alice")).toBe(
-		"ls ~/src",
-	);
+	expect(normalizePaths("ls /home/alice/src", "/home/alice")).toBe("ls ~/src");
 });
 
 test("normalizePaths: ~/subdir rewritten to ./ when under cwd", () => {
@@ -244,18 +239,12 @@ test("normalizePaths: ~/subdir rewritten to ./ when under cwd", () => {
 
 test("normalizePaths: ~/other not under cwd stays ~/other", () => {
 	expect(
-		normalizePaths(
-			"ls ~/other",
-			"/home/alice",
-			"/home/alice/code/myproject",
-		),
+		normalizePaths("ls ~/other", "/home/alice", "/home/alice/code/myproject"),
 	).toBe("ls ~/other");
 });
 
 test("normalizePaths: ~ alone (exact cwd) → .", () => {
-	expect(
-		normalizePaths("ls ~", "/home/alice", "/home/alice"),
-	).toBe("ls .");
+	expect(normalizePaths("ls ~", "/home/alice", "/home/alice")).toBe("ls .");
 });
 
 test("suggestPattern globs the first token", () => {
