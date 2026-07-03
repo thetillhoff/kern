@@ -40,12 +40,12 @@ Supported bases (all handled by one mechanism):
   "no arg escapes cwd" lexically without any anchor. Generalizing to `~/` and
   `/` bases requires resolving each arg to an absolute path and testing subtree
   containment, so `cwd`/`home` are threaded into the check.
-- **Decision-only, no execution rewrite.** The resolver decides allow-vs-prompt;
-  the executed command string is left as the user/agent typed it (modulo the
-  existing narrow prefix-normalization in `normalizePaths`). Rewriting would
-  collapse `//` and mangle non-path args (`curl https://x` → `https:/x`) for no
-  security gain — a confined path is correct as-typed, an escaping one prompts
-  regardless.
+- **Decision-only, no execution rewrite.** The *new resolver* only decides
+  allow-vs-prompt; it does not touch the command string. (`normalizePaths` still
+  rewrites `input.command` as it does today — see Wiring; that is pre-existing
+  and unchanged.) Adding a second rewrite would collapse `//` and mangle non-path
+  args (`curl https://x` → `https:/x`) for no security gain — a confined path is
+  correct as-typed, an escaping one prompts regardless.
 - **Marker: reuse `<cmd> <base>/*`.** No new config field. Existing `cat ./*` /
   `find ~/code/*` entries start working correctly on upgrade. Only `*/`-tailed
   (trailing `/*`) entries become confined; plain globs (`grep *`) and the
@@ -53,8 +53,11 @@ Supported bases (all handled by one mechanism):
   longer reads as a literal glob — documented in code.
 - **Confinement is allowlist-only.** Blocklist entries keep plain-glob
   semantics.
-- **Bare root `/*` unsupported.** It would confine to "everything" — degenerate.
-  A confined base must be non-empty after stripping the trailing `/*`.
+- **Root base unsupported.** Confining to `/` means confining to everything —
+  degenerate. A base is rejected (falls back to plain glob) when it is empty
+  after stripping the trailing `/*` **or** when `resolveAbs(base)` is `/`. The
+  latter guard catches `//*`, `/*/`, and any base that normalizes to root; an
+  empty-string check alone does not.
 
 ## Components (`extensions/safe-bash/rules.ts`)
 
@@ -68,6 +71,10 @@ A pattern is confined iff it ends with `/*` and the base is non-empty.
 Examples: `cat ./*` → prefix `cat`, base `.`; `find ~/code/*` → prefix `find`,
 base `~/code`; `git log ./*` → prefix `git log`, base `.`;
 `tail /var/log/*` → prefix `tail`, base `/var/log`.
+
+Parse is whitespace-naive: the base is the last whitespace-delimited token, so a
+base containing spaces (`tail "/var/my logs"/*`) is not supported. Such patterns
+are exotic in an allowlist; accepted limitation, noted in code.
 
 ### `resolveAbs(token, cwd, home): string`
 
@@ -84,13 +91,36 @@ Pure. The confined match test:
 - Command must equal `prefix` (bare, e.g. stdin use) **or** start with
   `prefix + " "`.
 - `absBase = resolveAbs(base, cwd, home)`.
-- For each argument token after `prefix`:
-  1. Skip tokens starting with `-` (flags).
-  2. Strip surrounding matching quotes (`"…"` / `'…'`).
-  3. Split on `=` and test each part (catches `--file=/etc/passwd`).
-  4. `absArg = resolveAbs(part, cwd, home)`; contained iff
+- For each argument token after `prefix`, in this order (order matters — see
+  below):
+  1. **Strip all quote characters** (`"` and `'`) from the token. Paths never
+     legitimately contain them, and stripping *all* of them — not just a matched
+     surrounding pair — defeats quote-concatenation escapes like
+     `".."/../etc/passwd` that a surrounding-pair strip leaves intact.
+  2. **Split on `=`** into parts (this must happen *before* the flag check, so a
+     `--file=/etc/passwd` value is not swallowed by the flag skip). Test each
+     part independently.
+  3. For each part starting with `-`:
+     - **contains no `/`** → pure flag, skip it.
+     - **contains `/`** (glued path forms like `-I/etc`, `grep -f/etc/shadow`) →
+       **return false immediately (prompt)**. Do *not* run it through
+       `resolveAbs`. The shell's real path is the substring after the flag
+       letters (`/etc/shadow`), but `resolveAbs` only tests `isAbsolute` on the
+       *whole* token — `-f/etc/shadow` is not absolute, so it would be joined to
+       `cwd` as `<cwd>/-f/etc/shadow`, test as *contained*, and auto-approve a
+       read of `/etc/shadow`. Bailing to a prompt is the only sound answer:
+       glued short flags carry no `=` to split on, so the token→path mapping
+       cannot be recovered lexically.
+  4. Non-flag part: `absArg = resolveAbs(part, cwd, home)`; contained iff
      `absArg === absBase || absArg.startsWith(absBase + "/")`.
 - Returns true iff the prefix matches and no argument falls outside `absBase`.
+
+The strip-then-split-then-flag-check order is load-bearing: skipping `-` tokens
+first (as an earlier draft did) would drop `--file=/etc/passwd` before it could
+be split, re-opening the very bypass this design closes. Equally load-bearing:
+a `-`-token containing `/` must bail to a prompt directly, **not** be handed to
+`resolveAbs` — a relative-looking token (`-f/etc/shadow`) joins *under* `cwd`
+and would falsely test as contained.
 
 ### Dispatch: `matchesAllowlistEntry(command, pattern, cwd, home): boolean`
 
@@ -130,9 +160,18 @@ and `home` are already computed in the extension.
   unaffected.
 - **Symlink inside the base pointing out is not detected** (lexical only) —
   `ponytail:` comment.
-- **Flag styles beyond `=`-split** (unusual glued forms) not covered —
-  `ponytail:` comment. Separately-tokenized flag values are already their own
-  tokens and handled.
+- **Glued flag+path forms are handled by failing safe**, not by parsing: any
+  `-` token containing `/` bails straight to a prompt (see `withinBase` step 3),
+  because its lexical resolution does not match how the shell splits flag from
+  path. The only remaining uncovered case is a glued flag whose path value
+  contains no `/` (e.g. `-f..`, value `..` — a bare parent ref); it is skipped as
+  a pure flag. Rare, points at a directory not a file, safe-ish for read
+  commands — `ponytail:` comment.
+- **`~user` (other users' homes) mis-resolves** — `resolveAbs` replaces only the
+  leading `~`, so `~foo` becomes `<home>foo`, not user `foo`'s home. Resolves
+  outside the base → prompts (safe direction). `ponytail:` comment.
+- **Quote-concatenation escapes are handled** by stripping all quote chars from
+  each token before resolving (see `withinBase` step 1).
 
 ## Tests (`extensions/safe-bash/rules.test.ts`)
 
@@ -143,10 +182,17 @@ Cover every row of the behavior table, plus:
 - `resolveAbs`: `~/x` → home, `/abs` → itself, `x`/`./x` → cwd-joined,
   `./a/../b` collapse
 - quote-stripped escape (`cat "../../etc/passwd"` → prompt)
-- `=`-split escape (`cat --file=/etc/passwd` → prompt)
+- quote-concatenation escape (`cat ".."/../etc/passwd` → prompt) — guards the
+  strip-all-quotes rule
+- `=`-split escape (`cat --file=/etc/passwd` → prompt) — guards the
+  split-before-flag-skip ordering; must fail if the skip runs first
+- glued flag+path escape (`grep -f/etc/shadow` with `grep ./*` → prompt) —
+  guards the "`-` token containing `/` bails to a prompt, is not run through
+  `resolveAbs`" rule; must fail if the token is instead cwd-joined (it would
+  then falsely test as contained and allow)
 - flag skipped (`cat -n README.md` → allow)
 - prefix mismatch (`lsof` vs `ls ./*`, `npm` vs `cat ./*`)
 - multi-word prefix (`git log ./x` matches `git log ./*`, `git log /abs` prompts)
 - integration: `normalizePaths` then match for a cwd-absolute and a home path
 - no interaction with the trailing `*` rule (`ls *` still matches bare `ls`)
-- `/*` bare-root base is not treated as confined
+- root base not treated as confined: bare `/*`, and `//*` (base resolves to `/`)
