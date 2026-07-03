@@ -39,7 +39,7 @@ Edit the config files:
 
 | Extension | What it does |
 | --- | --- |
-| `safe-bash` | Blocks dangerous commands; pre-approves allowlist patterns; prompts for unknown ones one sub-command at a time (split on `\|`, `\|\|`, `&&`, `;`) with Allow once / Allow always (edited pattern persisted to the shared allowlist) / Deny |
+| `safe-bash` | Blocks dangerous commands; pre-approves allowlist patterns (incl. directory-confined `<cmd> <base>/*` entries); prompts for unknown ones one sub-command at a time (split on `\|`, `\|\|`, `&&`, `;`, `&`, newline) with Allow once / Allow always (edited pattern persisted to the shared allowlist) / Deny |
 | `claude-compat` | Loads `~/.pi/PI.md` and `.pi/PI.md` into the system prompt each turn |
 | `model-router` | Selects the model for every session: an explicit tier (subagent `model_tier`) or human-pinned model wins, else an Ollama classifier picks light/medium/heavy, else a light fallback. Classifier is warmed on session start and on typing; decisions (incl. would-have-been latencies) traced to `~/.pi/model-decisions.jsonl` |
 | `fetch-url` | Adds `fetch_url` tool for reading HTTPS URLs |

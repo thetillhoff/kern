@@ -20,7 +20,7 @@ Behavior:
 - `rm -rf /` - blocked immediately, no prompt
 
 Chained commands are approved **one sub-command at a time**. Each segment split
-on `|`, `||`, `&&`, or `;` gets its own prompt:
+on `|`, `||`, `&&`, `;`, `&`, or a newline gets its own prompt:
 
 - `echo abc | cat` - prompts for `echo abc`, then for `cat`, separately.
 - A segment matching the blocklist blocks the whole command, no prompt.
@@ -29,6 +29,25 @@ on `|`, `||`, `&&`, or `;` gets its own prompt:
 Segments containing command substitution (`$(` or backticks) are always prompted,
 even when the outer command matches an allowlist pattern. The inner command cannot
 be split out and independently checked against the blocklist.
+
+### Directory-confined entries
+
+An allowlist entry ending in `<base>/*` confines a command to the `<base>`
+directory subtree instead of matching literally. It auto-approves the command
+with any arguments **as long as every path argument stays within `<base>`** -
+otherwise it prompts. Supported bases: `.` (cwd), `~` / `~/sub` (home), and
+`/abs/dir` (an absolute subtree).
+
+```json
+{ "bashSafety": { "allowlist": ["cat ./*", "find ~/code/*", "tail /var/log/*"] } }
+```
+
+- `cat README.md`, `cat -n ./src/x` - auto-approved (inside cwd)
+- `cat /etc/passwd`, `cat ../../etc/passwd` - prompt (escape the base)
+- Escapes via `./../..`, absolute paths, and unexpanded `$VAR` all prompt (fail safe).
+
+Path resolution is lexical (no symlink following). Confinement applies only to
+allowlist entries; the blocklist stays literal-glob.
 
 Each prompt offers **Allow once / Allow always / Deny**. "Allow always" opens an
 editable suggested glob (e.g. `echo *`) and appends it to the allowlist, so that
