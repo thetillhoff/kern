@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.15
+
+- Improve `fetch_url` description and prompt snippet: clarify it should be preferred over `curl`/bash for any HTTPS URL, including probing URL availability and surfacing HTTP error status codes
+
 ## v0.1.14
 
 - Fix `safe-bash` crash (`undefined is not an object (evaluating '…blocklist.some')`) when `bashSafety` in settings is partial (e.g. only `allowlist` set): `loadRules` now merges per-field defaults instead of falling back only when the whole object is absent
