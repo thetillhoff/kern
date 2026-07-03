@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.14
+
+- Fix `safe-bash` crash (`undefined is not an object (evaluating '…blocklist.some')`) when `bashSafety` in settings is partial (e.g. only `allowlist` set): `loadRules` now merges per-field defaults instead of falling back only when the whole object is absent
+
 ## v0.1.13
 
 - Fix cwd normalization in `safe-bash`: paths under the working directory are rewritten to `./…` before allowlist checks, so patterns like `ls ./*` match across subdirectories

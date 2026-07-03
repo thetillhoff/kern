@@ -19,18 +19,19 @@ interface BashSafetyRules {
 	requireConfirmForUnknown: boolean;
 }
 
-function loadRules(settingsPath: string): BashSafetyRules {
+export function loadRules(settingsPath: string): BashSafetyRules {
+	const defaults: BashSafetyRules = {
+		blocklist: [],
+		allowlist: [],
+		requireConfirmForUnknown: true,
+	};
 	try {
 		const settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
-		return (
-			settings.bashSafety ?? {
-				blocklist: [],
-				allowlist: [],
-				requireConfirmForUnknown: true,
-			}
-		);
+		// Merge per-field: a partial bashSafety (e.g. only allowlist set) must not
+		// leave blocklist/requireConfirmForUnknown undefined.
+		return { ...defaults, ...settings.bashSafety };
 	} catch {
-		return { blocklist: [], allowlist: [], requireConfirmForUnknown: true };
+		return defaults;
 	}
 }
 
