@@ -16,6 +16,10 @@ Things worth doing but not blocking immediate use.
   gets preserved.
 - **Settings hot-reload** - Extensions read config once per call. Detect file changes and
   reload without restarting Pi.
+- **`safe-bash`: `$VAR` in plain-glob allowlist entries** - Confined `<cmd> <base>/*` entries
+  fail safe on `$VAR` (resolves to unknown at runtime), but a broad glob like `cat *` still
+  auto-approves `cat $SECRET`, which expands at execution time. Consider blocking unexpanded
+  variables for glob entries too - weigh against breaking legit approved commands that use vars.
 
 ### Infrastructure
 
