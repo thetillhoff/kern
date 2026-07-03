@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.16
+
+- Fix `safe-bash` allow-always re-prompting: a trailing ` *` pattern (e.g. `ls *`, `git status *`) now also matches the bare command with no args, so a single grant covers both `ls` and `ls -la`. Previously the bare form never matched and kept prompting. `suggestPattern` now always emits `<cmd> *`
+
 ## v0.1.15
 
 - Improve `fetch_url` description and prompt snippet: clarify it should be preferred over `curl`/bash for any HTTPS URL, including probing URL availability and surfacing HTTP error status codes

@@ -21,10 +21,20 @@ export function matchesPattern(command: string, pattern: string): boolean {
 	if (SEPARATOR_RE.test(pattern)) return false;
 	let re = patternCache.get(pattern);
 	if (!re) {
-		const escaped = pattern
+		// A trailing " *" (the shape suggestPattern produces) means "this command
+		// with any args, including none" — so `git status *` matches bare
+		// `git status` too. Without this, every allow-always leaves the bare form
+		// re-prompting forever.
+		let core = pattern;
+		let tail = "$";
+		if (core.endsWith(" *")) {
+			core = core.slice(0, -2);
+			tail = "(?: .*)?$";
+		}
+		const escaped = core
 			.replace(/[.+?^${}()|[\]\\]/g, "\\$&")
 			.replace(/\*/g, ".*");
-		re = new RegExp(`^${escaped}$`);
+		re = new RegExp(`^${escaped}${tail}`);
 		patternCache.set(pattern, re);
 	}
 	return re.test(command.trim());
@@ -132,11 +142,12 @@ export function normalizePaths(
 /**
  * Suggest an allowlist glob for a command: the first token plus " *".
  * The human edits this before it is stored, so a broad default is fine.
- * For bare commands (single word), return the exact command without " *".
+ * A trailing " *" matches the bare command too (see matchesPattern), so one
+ * grant covers both `ls` and `ls -la`.
  */
 export function suggestPattern(command: string): string {
 	const trimmed = command.trim();
 	const first = trimmed.split(/\s+/)[0] ?? "";
 	if (!first) return "";
-	return trimmed === first ? first : `${first} *`;
+	return `${first} *`;
 }

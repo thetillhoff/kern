@@ -256,8 +256,8 @@ test("suggestPattern returns empty string for an empty command", () => {
 	expect(suggestPattern("")).toBe("");
 });
 
-test("suggestPattern: bare command → exact pattern", () => {
-	expect(suggestPattern("ls")).toBe("ls");
+test("suggestPattern: bare command → cmd *", () => {
+	expect(suggestPattern("ls")).toBe("ls *");
 });
 
 test("suggestPattern: command with args → cmd *", () => {
@@ -268,6 +268,14 @@ test("matchesPattern: bare command matches its own exact pattern", () => {
 	expect(matchesPattern("ls", "ls")).toBe(true);
 });
 
-test("matchesPattern: bare command does not match cmd * pattern", () => {
-	expect(matchesPattern("ls", "ls *")).toBe(false);
+test("matchesPattern: trailing ' *' matches the bare command (no args)", () => {
+	expect(matchesPattern("ls", "ls *")).toBe(true);
+	expect(matchesPattern("ls -la", "ls *")).toBe(true);
+	expect(matchesPattern("git status", "git status *")).toBe(true);
+	expect(matchesPattern("git status -s", "git status *")).toBe(true);
+});
+
+test("matchesPattern: trailing ' *' does not match a different command", () => {
+	expect(matchesPattern("lsof", "ls *")).toBe(false);
+	expect(matchesPattern("npm status", "git status *")).toBe(false);
 });
