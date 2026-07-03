@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.17
+
+- `safe-bash` allowlist entries of the form `<cmd> <base>/*` (e.g. `cat ./*`, `find ~/code/*`, `tail /var/log/*`) now confine the command to the `<base>` directory subtree by resolving each path argument and checking containment, instead of a naive glob. Closes a confinement bypass (`cat ./../../../etc/passwd` matched `cat ./*`) and stops re-prompting on bare relative names (`cat README.md`) and flags before the path (`cat -n README.md`)
+
 ## v0.1.16
 
 - Fix `safe-bash` allow-always re-prompting: a trailing ` *` pattern (e.g. `ls *`, `git status *`) now also matches the bare command with no args, so a single grant covers both `ls` and `ls -la`. Previously the bare form never matched and kept prompting. `suggestPattern` now always emits `<cmd> *`
