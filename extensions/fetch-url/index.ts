@@ -10,7 +10,8 @@ export default function (pi: ExtensionAPI) {
 		label: "Fetch URL",
 		description:
 			"Fetch the text content of an HTTPS URL. Returns plain text; strips HTML tags for web pages. Use for reading documentation, APIs, or any public HTTPS resource. Prefer this over bash/curl for any HTTPS URL — it also surfaces HTTP error status codes (e.g. 404, 403) via its error message, so it works for probing URL availability too.",
-		promptSnippet: "Use fetch_url to read any HTTPS web page or API response. Prefer it over curl or bash for any HTTPS URL check, even just to probe whether a URL exists or what status code it returns.",
+		promptSnippet:
+			"Use fetch_url to read any HTTPS web page or API response. Prefer it over curl or bash for any HTTPS URL check, even just to probe whether a URL exists or what status code it returns.",
 		parameters: Type.Object({
 			url: Type.String({ description: "The HTTPS URL to fetch" }),
 		}),
