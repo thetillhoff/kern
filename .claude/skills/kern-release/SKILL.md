@@ -43,14 +43,14 @@ git tag vX.Y.Z && git push origin main && git push origin vX.Y.Z
 ### 3. Confirm GitHub release created
 
 ```bash
-gh release view vX.Y.Z --repo thetillhoff/kern
+gh release view vX.Y.Z --repo thetillhoff/kern --json assets --jq '.assets[].name'
 ```
 
-Should show all 9 artifacts (4 tarballs + 4 sha256 files + 1 Windows exe).
+Should show all 10 artifacts: `kern_darwin_amd64.tar.gz`, `kern_darwin_arm64.tar.gz`, `kern_linux_amd64.tar.gz`, `kern_linux_arm64.tar.gz`, their four `.sha256` companions, and `kern_windows_amd64.exe` + its `.sha256`.
 
-### 4. Watch homebrew-tap update
+### 4. Watch homebrew-tap update ⚠️ Always do this step
 
-The `Release on tag` workflow triggers `update-kern.yml` in `thetillhoff/homebrew-tap` automatically via `HOMEBREW_TAP_ACCESS_TOKEN`.
+The `Release on tag` workflow automatically triggers `update-kern.yml` in `thetillhoff/homebrew-tap` via `HOMEBREW_TAP_ACCESS_TOKEN`. **This is what makes `brew upgrade kern` work — don't skip it.**
 
 ```bash
 gh run list --repo thetillhoff/homebrew-tap --workflow update-kern.yml --limit 3
@@ -62,15 +62,18 @@ Wait for `completed / success`. If it fails:
 gh run view <run-id> --log-failed --repo thetillhoff/homebrew-tap
 ```
 
-### 5. Verify formula updated
+### 5. Verify formula updated ⚠️ Always do this step
 
 ```bash
 gh api repos/thetillhoff/homebrew-tap/contents/Formula/kern.rb \
   --jq '.content' | base64 -d | grep -E "version|url|sha256" | head -10
 ```
 
-The version string and sha256 hashes should match the new release.
+Confirm:
+- `version` matches the new tag (e.g. `v0.1.15`)
+- All four sha256 hashes are present and non-empty
+- Formula lives at: https://github.com/thetillhoff/homebrew-tap/blob/main/Formula/kern.rb
 
 ### 6. Done
 
-Announce or proceed. The full pipeline from tag push to brew-installable release typically takes 3-5 minutes.
+Announce or proceed. The full pipeline from tag push to brew-installable release typically takes 3–5 minutes.
