@@ -3,7 +3,9 @@ import { posix as path } from "node:path";
 // Shell separators that must not appear inside a single pattern. A pattern
 // containing these would never match a segment (segments have separators
 // stripped) and could indicate a bypass attempt if stored in the allowlist.
-const SEPARATOR_RE = /&&|\|\||[|;]/;
+// Includes a single `&` (background operator) and newlines: both start a new
+// command, so a segment must never span them.
+const SEPARATOR_RE = /[|;&\n\r]/;
 
 // Command and process substitution syntax. Segments or patterns containing
 // these are always prompted (never auto-approved via the allowlist) because
@@ -81,12 +83,20 @@ export function withinBase(
 	else if (cmd.startsWith(`${prefix} `)) rest = cmd.slice(prefix.length + 1);
 	else return false;
 
+	// Defense in depth: a newline starts a new command. splitSegments already
+	// splits on it before we are reached, but never approve args that span one —
+	// otherwise a second command's words would be checked as this prefix's args.
+	if (/[\n\r]/.test(rest)) return false;
+
 	const absBase = resolveAbs(base, cwd, home);
 	for (const token of rest.split(/\s+/).filter(Boolean)) {
 		const unquoted = token.replace(/['"]/g, ""); // 1. strip all quotes
 		for (const part of unquoted.split("=")) {
 			// 2. split before flag check
 			if (part === "") continue;
+			// Unexpanded shell variables ($VAR/${VAR}) resolve to an unknown
+			// value at execution time; we cannot prove containment, so fail safe.
+			if (part.includes("$")) return false;
 			if (part.startsWith("-")) {
 				// ponytail: a glued flag+path with no '/' (e.g. `-f..`) is
 				// indistinguishable from a pure flag and is skipped rather than
@@ -207,7 +217,13 @@ export function splitSegments(command: string): string[] | null {
 					segments.push(current.trim());
 					current = "";
 					i++;
-				} else if (ch === "|" || ch === ";") {
+				} else if (
+					ch === "|" ||
+					ch === ";" ||
+					ch === "&" || // background operator — starts a new command
+					ch === "\n" ||
+					ch === "\r" // newline separates commands
+				) {
 					segments.push(current.trim());
 					current = "";
 				} else {

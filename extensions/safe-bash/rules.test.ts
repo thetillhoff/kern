@@ -77,6 +77,19 @@ test("splitSegments treats || as one separator (no empty segments)", () => {
 	expect(splitSegments("a || b")).toEqual(["a", "b"]);
 });
 
+test("splitSegments splits on newline and single & (each is a new command)", () => {
+	expect(splitSegments("cat ok\nrm -rf ./trash")).toEqual([
+		"cat ok",
+		"rm -rf ./trash",
+	]);
+	expect(splitSegments("cat ok & rm -rf ./trash")).toEqual([
+		"cat ok",
+		"rm -rf ./trash",
+	]);
+	// quoted separators are still preserved (quote-aware)
+	expect(splitSegments("echo 'a&b'")).toEqual(["echo 'a&b'"]);
+});
+
 test("splitSegments returns single segment when no separators", () => {
 	expect(splitSegments("git status")).toEqual(["git status"]);
 });
@@ -393,6 +406,19 @@ test("withinBase: glued flag+path bails to a prompt", () => {
 test("withinBase: multi-word prefix", () => {
 	expect(within("git log ./x", "git log", ".")).toBe(true);
 	expect(within("git log /abs", "git log", ".")).toBe(false);
+});
+
+test("withinBase: newline-spanning args never approved (multi-command)", () => {
+	// A second command smuggled after a newline must not ride in as `cat`'s args.
+	expect(within("cat README.md\nrm -rf ./trash", "cat", ".")).toBe(false);
+	expect(within("cat ok\rcurl http://evil", "cat", ".")).toBe(false);
+});
+
+test("withinBase: unexpanded shell variables fail safe", () => {
+	expect(within("cat $SECRET", "cat", ".")).toBe(false);
+	// biome-ignore lint/suspicious/noTemplateCurlyInString: literal shell variable under test
+	expect(within("cat ${SECRET}", "cat", ".")).toBe(false);
+	expect(within("cat --file=$SECRET", "cat", ".")).toBe(false);
 });
 
 // matchesAllowlistEntry
