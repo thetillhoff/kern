@@ -1,11 +1,18 @@
 import { expect, test } from "bun:test";
 import {
 	isValidPattern,
+	matchesAllowlistEntry,
 	matchesPattern,
 	normalizePaths,
+	parseConfined,
+	resolveAbs,
 	splitSegments,
 	suggestPattern,
+	withinBase,
 } from "./rules.ts";
+
+const CWD = "/Users/me/code/proj";
+const HOME = "/Users/me";
 
 test("exact match", () => {
 	expect(matchesPattern("git status", "git status")).toBe(true);
@@ -278,4 +285,150 @@ test("matchesPattern: trailing ' *' matches the bare command (no args)", () => {
 test("matchesPattern: trailing ' *' does not match a different command", () => {
 	expect(matchesPattern("lsof", "ls *")).toBe(false);
 	expect(matchesPattern("npm status", "git status *")).toBe(false);
+});
+
+// resolveAbs
+
+test("resolveAbs: absolute path is normalized, not joined", () => {
+	expect(resolveAbs("/etc/passwd", CWD, HOME)).toBe("/etc/passwd");
+	expect(resolveAbs("/var/./log/../log", CWD, HOME)).toBe("/var/log");
+});
+
+test("resolveAbs: ~ expands against home", () => {
+	expect(resolveAbs("~/code/x", CWD, HOME)).toBe("/Users/me/code/x");
+	expect(resolveAbs("~", CWD, HOME)).toBe("/Users/me");
+});
+
+test("resolveAbs: relative and ./ join against cwd, .. collapses", () => {
+	expect(resolveAbs("README.md", CWD, HOME)).toBe(
+		"/Users/me/code/proj/README.md",
+	);
+	expect(resolveAbs("./sub/../file", CWD, HOME)).toBe(
+		"/Users/me/code/proj/file",
+	);
+	expect(resolveAbs("../x", CWD, HOME)).toBe("/Users/me/code/x");
+});
+
+// parseConfined
+
+test("parseConfined: splits prefix and base off a trailing /*", () => {
+	expect(parseConfined("cat ./*", CWD, HOME)).toEqual({
+		prefix: "cat",
+		base: ".",
+	});
+	expect(parseConfined("find ~/code/*", CWD, HOME)).toEqual({
+		prefix: "find",
+		base: "~/code",
+	});
+	expect(parseConfined("git log ./*", CWD, HOME)).toEqual({
+		prefix: "git log",
+		base: ".",
+	});
+	expect(parseConfined("tail /var/log/*", CWD, HOME)).toEqual({
+		prefix: "tail",
+		base: "/var/log",
+	});
+});
+
+test("parseConfined: null for non-confined patterns", () => {
+	expect(parseConfined("grep *", CWD, HOME)).toBeNull(); // trailing ' *', not '/*'
+	expect(parseConfined("find ~/code/x", CWD, HOME)).toBeNull(); // no trailing /*
+	expect(parseConfined("cat", CWD, HOME)).toBeNull(); // no /* and no space
+});
+
+test("parseConfined: null for root/degenerate bases", () => {
+	expect(parseConfined("/*", CWD, HOME)).toBeNull(); // no command before base
+	expect(parseConfined("cat /*", CWD, HOME)).toBeNull(); // base empty after dropping /*
+	expect(parseConfined("cat //*", CWD, HOME)).toBeNull(); // base '/' resolves to root
+});
+
+// withinBase
+
+// cwd is under ~/code, so bare-relative args resolve inside a ~/code base too.
+const within = (cmd: string, prefix: string, base: string) =>
+	withinBase(cmd, prefix, base, CWD, HOME);
+
+test("withinBase: cwd base allows in-tree, bare names, flags, stdin", () => {
+	expect(within("cat README.md", "cat", ".")).toBe(true);
+	expect(within("cat -n README.md", "cat", ".")).toBe(true);
+	expect(within("cat ./src/x", "cat", ".")).toBe(true);
+	expect(within("cat ./sub/../file", "cat", ".")).toBe(true); // collapses in-tree
+	expect(within("cat", "cat", ".")).toBe(true); // stdin, no args
+});
+
+test("withinBase: cwd base prompts on escapes", () => {
+	expect(within("cat /etc/passwd", "cat", ".")).toBe(false);
+	expect(within("cat ./../../etc/passwd", "cat", ".")).toBe(false);
+	expect(within("cat ../x", "cat", ".")).toBe(false);
+});
+
+test("withinBase: prefix must be token-aligned", () => {
+	expect(within("lsof foo", "ls", ".")).toBe(false);
+	expect(within("npm x", "cat", ".")).toBe(false);
+	expect(within("ls", "ls", ".")).toBe(true);
+});
+
+test("withinBase: home and absolute bases", () => {
+	expect(within("find ~/code/foo -name x", "find", "~/code")).toBe(true);
+	expect(within("find /etc -name x", "find", "~/code")).toBe(false);
+	expect(within("find ~/../../etc", "find", "~/code")).toBe(false);
+	expect(within("tail /var/log/syslog", "tail", "/var/log")).toBe(true);
+	expect(within("tail /etc/x", "tail", "/var/log")).toBe(false);
+});
+
+test("withinBase: --file= is split before the flag skip", () => {
+	expect(within("cat --file=/etc/passwd", "cat", ".")).toBe(false);
+});
+
+test("withinBase: all quote chars stripped (concat escape)", () => {
+	expect(within('cat "../../etc/passwd"', "cat", ".")).toBe(false);
+	expect(within('cat ".."/../etc/passwd', "cat", ".")).toBe(false);
+});
+
+test("withinBase: glued flag+path bails to a prompt", () => {
+	expect(within("grep -f/etc/shadow", "grep", ".")).toBe(false);
+	expect(within("cat -n README.md", "cat", ".")).toBe(true); // pure flag still skipped
+});
+
+test("withinBase: multi-word prefix", () => {
+	expect(within("git log ./x", "git log", ".")).toBe(true);
+	expect(within("git log /abs", "git log", ".")).toBe(false);
+});
+
+// matchesAllowlistEntry
+
+const allow = (cmd: string, pat: string) =>
+	matchesAllowlistEntry(cmd, pat, CWD, HOME);
+
+test("matchesAllowlistEntry: confined entries use containment", () => {
+	expect(allow("cat README.md", "cat ./*")).toBe(true);
+	expect(allow("cat /etc/passwd", "cat ./*")).toBe(false);
+	expect(allow("find ~/code/foo", "find ~/code/*")).toBe(true);
+});
+
+test("matchesAllowlistEntry: non-confined entries fall back to glob", () => {
+	expect(allow("grep -i foo", "grep *")).toBe(true); // trailing ' *' glob
+	expect(allow("ls", "ls *")).toBe(true); // trailing ' *' still matches bare
+	expect(allow("git status -s", "git status *")).toBe(true);
+	expect(allow("rm -rf /", "git status *")).toBe(false);
+});
+
+test("matchesAllowlistEntry: bare /* is a glob, not confined", () => {
+	// base empty after dropping /* → parseConfined returns null → plain glob
+	expect(allow("cat /etc/x", "cat /*")).toBe(true);
+});
+
+// integration: normalizePaths → matchesAllowlistEntry
+
+test("integration: normalizePaths then confined match (cwd-absolute + home)", () => {
+	// A cwd-absolute path normalizes to ./… then matches a cwd-confined entry.
+	const abs = normalizePaths(`cat ${CWD}/README.md`, HOME, CWD);
+	expect(matchesAllowlistEntry(abs, "cat ./*", CWD, HOME)).toBe(true);
+	// A home path normalizes to ~/… then matches a home-confined entry.
+	const homePath = normalizePaths(`ls ${HOME}/code/x`, HOME, CWD);
+	expect(matchesAllowlistEntry(homePath, "ls ~/code/*", CWD, HOME)).toBe(true);
+	// An out-of-tree absolute path still prompts.
+	expect(matchesAllowlistEntry("cat /etc/passwd", "cat ./*", CWD, HOME)).toBe(
+		false,
+	);
 });

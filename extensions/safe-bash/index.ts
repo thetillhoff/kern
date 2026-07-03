@@ -6,6 +6,7 @@ import { queuedSelect } from "../shared/permission-queue.ts";
 import { appendAllowlistPattern } from "./allowlist.ts";
 import {
 	isValidPattern,
+	matchesAllowlistEntry,
 	matchesPattern,
 	normalizePaths,
 	SUBST_RE,
@@ -74,7 +75,7 @@ export default function (pi: ExtensionAPI) {
 			if (decided.has(seg)) continue; // don't re-prompt an identical segment
 			if (
 				!SUBST_RE.test(seg) &&
-				rules.allowlist.some((p) => matchesPattern(seg, p))
+				rules.allowlist.some((p) => matchesAllowlistEntry(seg, p, cwd, home))
 			)
 				continue; // pre-approved (or just allow-always'd)
 
