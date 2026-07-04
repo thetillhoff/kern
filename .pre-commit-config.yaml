@@ -1,0 +1,23 @@
+repos:
+  - repo: local
+    hooks:
+      - id: biome-check
+        name: biome check
+        language: system
+        entry: bash -c 'cd extensions && bunx biome check .'
+        pass_filenames: false
+        files: ^extensions/
+
+      - id: tsc
+        name: tsc --noEmit
+        language: system
+        entry: bash -c 'cd extensions && bunx tsc --noEmit'
+        pass_filenames: false
+        files: ^extensions/
+
+      - id: bun-test
+        name: bun test
+        language: system
+        entry: bash -c 'cd extensions && bun test'
+        pass_filenames: false
+        files: ^extensions/
