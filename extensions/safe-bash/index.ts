@@ -43,6 +43,28 @@ export default function (pi: ExtensionAPI) {
 	const cwd = process.cwd();
 	const rules = loadRules(settingsPath);
 
+	// Collects optional user comments attached to "Allow once" approvals, keyed by
+	// toolCallId. The tool_result handler appends them to the bash output so the
+	// agent receives the user's guidance even though the command was allowed.
+	const pendingComments = new Map<string, string[]>();
+
+	pi.on("tool_result", (event) => {
+		if (event.toolName !== "bash") return;
+		const comments = pendingComments.get(event.toolCallId);
+		if (!comments?.length) return;
+		pendingComments.delete(event.toolCallId);
+		const note =
+			comments.length === 1
+				? `[User note: ${comments[0]}]`
+				: `[User notes:\n${comments.map((c, i) => `${i + 1}. ${c}`).join("\n")}]`;
+		return {
+			content: [
+				...event.content,
+				{ type: "text" as const, text: `\n\n${note}` },
+			],
+		};
+	});
+
 	pi.on("tool_call", async (event, ctx) => {
 		if (event.toolName !== "bash") return;
 		const input = event.input as { command?: string };
@@ -118,10 +140,31 @@ export default function (pi: ExtensionAPI) {
 				decided.add(seg);
 				continue;
 			}
-			if (choice !== "Allow once") {
-				return { block: true, reason: `User denied: ${seg}` };
+			if (choice === "Allow once") {
+				const comment = await ctx.ui.input(
+					"Note for the agent (optional)",
+					"e.g. please use git status instead next time",
+				);
+				if (comment?.trim()) {
+					const existing = pendingComments.get(event.toolCallId) ?? [];
+					existing.push(comment.trim());
+					pendingComments.set(event.toolCallId, existing);
+				}
+				decided.add(seg);
+				continue;
 			}
-			decided.add(seg);
+			// "Deny" or undefined (user cancelled the select prompt)
+			let reason = `User denied: ${seg}`;
+			if (choice === "Deny") {
+				const comment = await ctx.ui.input(
+					"Reason for the agent (optional)",
+					"e.g. use git status instead",
+				);
+				if (comment?.trim()) {
+					reason = `User denied: ${seg} — ${comment.trim()}`;
+				}
+			}
+			return { block: true, reason };
 		}
 	});
 }

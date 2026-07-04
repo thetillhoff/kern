@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.20
+
+- `safe-bash` approval prompts now accept an optional comment: "Allow once" shows a follow-up input where the user can leave a note for the agent (e.g. "use git status instead next time"); the note is appended to the bash tool result so the agent sees it in the same turn. "Deny" shows a similar input whose text is appended to the block reason. "Allow always" is unchanged. Pressing Esc or submitting empty skips the comment.
+
 ## v0.1.19
 
 - Add `.pre-commit-config.yaml` with local hooks mirroring CI (biome, tsc, bun test) so formatting and type errors are caught before push
