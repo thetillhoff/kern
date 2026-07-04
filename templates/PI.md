@@ -36,11 +36,14 @@ current codebase, say so rather than inventing a plausible-sounding answer.
 - Always write paths literally: `/abs/path`, `./rel/path`, or `~/home/path`.
   Never assign a path to a variable and reference it via `$VAR/cmd` — the approval
   system cannot see through variable expansion and will prompt for every use.
+- To run a command in another directory, always use `cd <path> && <command>`.
+  Never use flags that set the working directory inline (e.g. `git -C <path>`,
+  `make -C <path>`, `npm --prefix <path>`) — the approval system matches against
+  the command text and cannot see that the effective path differs from cwd.
 
 ## Git
 
 - Always use SSH URLs for `git clone`: `git@github.com:<owner>/<repo>.git`
-- Use `cd <path> && git <cmd>`, never `git -C <path> <cmd>`
 
 ## Verification
 

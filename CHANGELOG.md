@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.21
+
+- `templates/PI.md` Shell section: generalize the `cd <path> && <command>` rule to all commands, not just git. Explains that flags like `git -C`, `make -C`, `npm --prefix` are disallowed because the approval system matches against command text and cannot see that the effective path differs from cwd. The git-specific duplicate bullet is removed.
+
 ## v0.1.20
 
 - `safe-bash` approval prompts now accept an optional comment: "Allow once" shows a follow-up input where the user can leave a note for the agent (e.g. "use git status instead next time"); the note is appended to the bash tool result so the agent sees it in the same turn. "Deny" shows a similar input whose text is appended to the block reason. "Allow always" is unchanged. Pressing Esc or submitting empty skips the comment.
