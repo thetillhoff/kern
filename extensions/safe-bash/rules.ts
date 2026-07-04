@@ -162,12 +162,111 @@ export function matchesPattern(command: string, pattern: string): boolean {
 }
 
 /**
+ * Returns true when a shell segment is a pure variable assignment — a bare
+ * `NAME=value` with no command substitution. Such segments set a variable in
+ * the current shell but execute nothing, so they need no independent approval.
+ *
+ * Matches:     SCRIPTS=/path/to/scripts, FOO=bar, _VAR=123
+ * Does not match: VAR=$(cmd), A=`cmd`        — command substitution in value
+ *                 env VAR=x cmd, cmd VAR=x    — assignment prefixing a command
+ */
+export function isPureAssignment(segment: string): boolean {
+	const s = segment.trim();
+	// Must start with a valid shell identifier immediately followed by `=`
+	if (!/^[A-Za-z_][A-Za-z0-9_]*=/.test(s)) return false;
+	// Reject if the value contains command substitution (something executes)
+	return !SUBST_RE.test(s);
+}
+
+/**
  * Return true when a pattern string is safe to store in the allowlist.
  * Rejects patterns containing shell separators.
  */
 export function isValidPattern(pattern: string): boolean {
 	const t = pattern.trim();
 	return !SEPARATOR_RE.test(t) && !SUBST_RE.test(t);
+}
+
+/**
+ * Given a command string and the index of the first `<` of a `<<` or `<<-`
+ * heredoc redirect, consume the entire heredoc (delimiter header + body lines +
+ * terminator line) and return the text consumed and the index of the first
+ * character after the heredoc. Returns null when the delimiter is empty
+ * (malformed); an unterminated heredoc (EOF before delimiter) is returned
+ * as-is so the caller can treat it as one segment rather than blocking.
+ *
+ * Delimiter quoting rules:
+ *   `<< EOF`   – word is EOF (no quotes)
+ *   `<< 'EOF'` – word is EOF (single quotes, no expansion in body)
+ *   `<< "EOF"` – word is EOF (double quotes)
+ * In all cases the terminator is a line whose content, after stripping leading
+ * tabs when `<<-` is used, equals the unquoted delimiter word.
+ */
+function scanHeredoc(
+	command: string,
+	start: number,
+): { end: number; text: string } | null {
+	let i = start;
+	let text = "";
+
+	// consume `<<`
+	text += command[i++]; // first '<'
+	text += command[i++]; // second '<'
+
+	// optional `-` for `<<-` (strips leading tabs from body lines and terminator)
+	let stripTabs = false;
+	if (i < command.length && command[i] === "-") {
+		stripTabs = true;
+		text += command[i++];
+	}
+
+	// skip optional whitespace before the delimiter word
+	while (i < command.length && (command[i] === " " || command[i] === "\t")) {
+		text += command[i++];
+	}
+
+	// read the delimiter word: everything up to (but not including) the newline
+	let rawDelim = "";
+	while (i < command.length && command[i] !== "\n" && command[i] !== "\r") {
+		rawDelim += command[i];
+		text += command[i++];
+	}
+
+	rawDelim = rawDelim.trim();
+	if (rawDelim === "") return null; // empty delimiter – malformed
+
+	// strip a matching pair of surrounding quotes (single or double)
+	const strippedDelim = rawDelim.replace(/^(['"])(.*?)\1$/, "$2");
+
+	// consume the newline that ends the `<<` line
+	if (i < command.length && command[i] === "\r") text += command[i++];
+	if (i < command.length && command[i] === "\n") text += command[i++];
+
+	// scan body lines until we find the terminator
+	while (i < command.length) {
+		let line = "";
+		while (i < command.length && command[i] !== "\n" && command[i] !== "\r") {
+			line += command[i++];
+		}
+
+		// for `<<-`: strip leading tabs before comparing to the delimiter
+		const checkLine = stripTabs ? line.replace(/^\t+/, "") : line;
+		if (checkLine === strippedDelim) {
+			text += line;
+			if (i < command.length && command[i] === "\r") text += command[i++];
+			if (i < command.length && command[i] === "\n") text += command[i++];
+			return { end: i, text };
+		}
+
+		// body line – append without triggering a segment split
+		text += line;
+		if (i < command.length && command[i] === "\r") text += command[i++];
+		if (i < command.length && command[i] === "\n") text += command[i++];
+	}
+
+	// reached EOF before the terminator – return what we consumed rather than
+	// blocking, so an unterminated heredoc is still one segment.
+	return { end: i, text };
 }
 
 /**
@@ -220,12 +319,29 @@ export function splitSegments(command: string): string[] | null {
 				} else if (
 					ch === "|" ||
 					ch === ";" ||
-					ch === "&" || // background operator — starts a new command
+					// `&` is a background / sequence operator UNLESS it is part of a
+					// shell fd-redirect:
+					//   >&n / >&-  — fd-redirect target marker   (e.g. 2>&1)
+					//   &>  / &>>  — redirect-both-streams       (e.g. cmd &>/dev/null)
+					(ch === "&" &&
+						two !== "&>" && // not &> or &>> redirect
+						!(i > 0 && command[i - 1] === ">")) || // not >& fd redirect
 					ch === "\n" ||
 					ch === "\r" // newline separates commands
 				) {
 					segments.push(current.trim());
 					current = "";
+				} else if (
+					two === "<<" &&
+					// guard against <<< (herestring): char before and char after
+					// must not be `<`.
+					(i === 0 || command[i - 1] !== "<") &&
+					(i + 2 >= command.length || command[i + 2] !== "<")
+				) {
+					const heredoc = scanHeredoc(command, i);
+					if (heredoc === null) return null; // malformed heredoc – block
+					current += heredoc.text;
+					i = heredoc.end - 1; // -1: the for-loop's i++ will advance to heredoc.end
 				} else {
 					current += ch;
 				}

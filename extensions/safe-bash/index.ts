@@ -9,6 +9,7 @@ import {
 	matchesAllowlistEntry,
 	matchesPattern,
 	normalizePaths,
+	isPureAssignment,
 	SUBST_RE,
 	splitSegments,
 	suggestPattern,
@@ -73,6 +74,10 @@ export default function (pi: ExtensionAPI) {
 		const decided = new Set<string>();
 		for (const seg of toCheck) {
 			if (decided.has(seg)) continue; // don't re-prompt an identical segment
+			// Pure variable assignments (e.g. SCRIPTS=/path) execute nothing —
+			// skip the approval prompt; the command that uses the variable still
+			// gets its own prompt.
+			if (isPureAssignment(seg)) continue;
 			if (
 				!SUBST_RE.test(seg) &&
 				rules.allowlist.some((p) => matchesAllowlistEntry(seg, p, cwd, home))
@@ -85,8 +90,10 @@ export default function (pi: ExtensionAPI) {
 				["Allow once", "Allow always…", "Deny"],
 			);
 			if (choice === "Allow always…") {
+				// Show the original command in the (read-only) editor title so the
+				// user can see what they are allowing while editing the pattern.
 				const edited = await ctx.ui.editor(
-					"Allowlist pattern (edit before saving)",
+					`Allowlist pattern for: ${seg}`,
 					suggestPattern(seg),
 				);
 				const trimmed = edited?.trim() ?? "";

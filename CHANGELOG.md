@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.1.18
+
+- `safe-bash` heredoc commands (`<< 'EOF'` … `EOF`, any delimiter) are now treated as a single segment instead of being split line-by-line, so multiline heredocs no longer trigger a separate approval prompt per line
+- `safe-bash` fd-redirects (`2>&1`, `>&2`, `cmd &>/dev/null`, `cmd &>>log`) are no longer split on the `&` character; only bare background operators (`cmd &`, `cmd & cmd2`) still split
+- `safe-bash` pure shell variable assignments (`SCRIPTS=/path/to/scripts`) are auto-approved without a prompt — nothing executes, and the command that uses the variable still gets its own prompt; assignments with command substitution (`VAR=$(…)`) are still prompted
+- `safe-bash` "Allow always" editor title now shows the original command being allowed, so it remains visible while editing the allowlist pattern
+- `templates/PI.md` adds a Shell rule: always write paths as `/abs`, `./rel`, or `~/home` — never via `$VAR/cmd` which the approval system cannot see through
+
 ## v0.1.17
 
 - `safe-bash` allowlist entries of the form `<cmd> <base>/*` (e.g. `cat ./*`, `find ~/code/*`, `tail /var/log/*`) now confine the command to the `<base>` directory subtree by resolving each path argument and checking containment, instead of a naive glob. Closes a confinement bypass (`cat ./../../../etc/passwd` matched `cat ./*`) and stops re-prompting on bare relative names (`cat README.md`) and flags before the path (`cat -n README.md`)

@@ -31,6 +31,12 @@ current codebase, say so rather than inventing a plausible-sounding answer.
 - **CoC** (Convention over Configuration) — follow existing patterns before inventing new ones.
 - **Fail fast** — surface errors at the boundary; don't swallow and continue silently.
 
+## Shell
+
+- Always write paths literally: `/abs/path`, `./rel/path`, or `~/home/path`.
+  Never assign a path to a variable and reference it via `$VAR/cmd` — the approval
+  system cannot see through variable expansion and will prompt for every use.
+
 ## Git
 
 - Always use SSH URLs for `git clone`: `git@github.com:<owner>/<repo>.git`

@@ -4,6 +4,7 @@ import {
 	matchesAllowlistEntry,
 	matchesPattern,
 	normalizePaths,
+	isPureAssignment,
 	parseConfined,
 	resolveAbs,
 	splitSegments,
@@ -13,6 +14,38 @@ import {
 
 const CWD = "/Users/me/code/proj";
 const HOME = "/Users/me";
+
+// isPureAssignment
+
+test("isPureAssignment: simple value assignments are pure", () => {
+	expect(isPureAssignment("SCRIPTS=/path/to/scripts")).toBe(true);
+	expect(isPureAssignment("FOO=bar")).toBe(true);
+	expect(isPureAssignment("_VAR=123")).toBe(true);
+	expect(isPureAssignment("MY_VAR=hello world")).toBe(true);
+});
+
+test("isPureAssignment: command substitution in value is not pure", () => {
+	expect(isPureAssignment("VAR=$(rm -rf /)")).toBe(false);
+	expect(isPureAssignment("VAR=`rm -rf /`")).toBe(false);
+});
+
+test("isPureAssignment: assignment-prefixed commands are not pure", () => {
+	// env-style prefix (space before the command) is not a bare assignment
+	expect(isPureAssignment("env FOO=bar cmd")).toBe(false);
+});
+
+test("isPureAssignment: plain commands are not assignments", () => {
+	expect(isPureAssignment("git status")).toBe(false);
+	expect(isPureAssignment("cd /tmp")).toBe(false);
+	expect(isPureAssignment("sqlc generate 2>&1")).toBe(false);
+});
+
+test("isPureAssignment: empty and invalid identifier forms", () => {
+	expect(isPureAssignment("")).toBe(false);
+	expect(isPureAssignment("=value")).toBe(false); // no name
+	expect(isPureAssignment("1VAR=x")).toBe(false); // starts with digit
+});
+
 
 test("exact match", () => {
 	expect(matchesPattern("git status", "git status")).toBe(true);
@@ -90,6 +123,26 @@ test("splitSegments splits on newline and single & (each is a new command)", () 
 	expect(splitSegments("echo 'a&b'")).toEqual(["echo 'a&b'"]);
 });
 
+test("splitSegments: >& fd redirect is not a separator (e.g. 2>&1)", () => {
+	expect(splitSegments("sqlc generate 2>&1")).toEqual(["sqlc generate 2>&1"]);
+	expect(splitSegments("cmd >&2")).toEqual(["cmd >&2"]);
+	expect(splitSegments("cmd 3>&-")).toEqual(["cmd 3>&-"]);
+});
+
+test("splitSegments: &> and &>> redirect-both-streams are not separators", () => {
+	expect(splitSegments("make build &>/dev/null")).toEqual([
+		"make build &>/dev/null",
+	]);
+	expect(splitSegments("make build &>> /tmp/out.log")).toEqual([
+		"make build &>> /tmp/out.log",
+	]);
+});
+
+test("splitSegments: bare & background operator still splits", () => {
+	expect(splitSegments("cmd &")).toEqual(["cmd"]);
+	expect(splitSegments("cmd & cmd2")).toEqual(["cmd", "cmd2"]);
+});
+
 test("splitSegments returns single segment when no separators", () => {
 	expect(splitSegments("git status")).toEqual(["git status"]);
 });
@@ -156,6 +209,56 @@ test("splitSegments: && inside quotes does not split", () => {
 	expect(splitSegments('echo "hello && world"')).toEqual([
 		'echo "hello && world"',
 	]);
+});
+
+// heredoc support
+
+test("splitSegments: heredoc with single-quoted delimiter is one segment", () => {
+	const cmd = "cat >> /tmp/file.md << 'EOF'\nhello\nworld\nEOF";
+	expect(splitSegments(cmd)).toEqual([cmd]);
+});
+
+test("splitSegments: heredoc with unquoted delimiter is one segment", () => {
+	const cmd = "cat >> /tmp/file.md << EOF\nhello\nworld\nEOF";
+	expect(splitSegments(cmd)).toEqual([cmd]);
+});
+
+test("splitSegments: heredoc with double-quoted delimiter is one segment", () => {
+	const cmd = 'cat >> /tmp/file.md << "EOF"\nhello\nEOF';
+	expect(splitSegments(cmd)).toEqual([cmd]);
+});
+
+test("splitSegments: heredoc with custom delimiter (FOO) is one segment", () => {
+	const cmd = "cat >> /tmp/file.md << 'FOO'\nsome content\nFOO";
+	expect(splitSegments(cmd)).toEqual([cmd]);
+});
+
+test("splitSegments: heredoc with multi-line body is one segment", () => {
+	const cmd =
+		"cat >> /tmp/progress.md << 'EOF'\n\n---\n\n# Progress\n\nTask 1: pending\nEOF";
+	expect(splitSegments(cmd)).toEqual([cmd]);
+});
+
+test("splitSegments: <<- strips leading tabs from terminator", () => {
+	const cmd = "cat <<-EOF\n\thello\nEOF";
+	expect(splitSegments(cmd)).toEqual([cmd]);
+});
+
+test("splitSegments: heredoc followed by && splits into two segments", () => {
+	const heredocPart = "cat >> /tmp/a << 'EOF'\ncontent\nEOF";
+	const cmd = `${heredocPart}\n&& echo done`;
+	expect(splitSegments(cmd)).toEqual([heredocPart, "echo done"]);
+});
+
+test("splitSegments: <<< (herestring) is not treated as heredoc", () => {
+	// herestring — the <<< and its word stay as one segment, no split
+	const cmd = "cat <<< 'hello world'";
+	expect(splitSegments(cmd)).toEqual([cmd]);
+});
+
+test("splitSegments: unterminated heredoc (no closing delimiter) is one segment", () => {
+	const cmd = "cat << 'EOF'\nsome content without closing";
+	expect(splitSegments(cmd)).toEqual([cmd]);
 });
 
 // normalizePaths
