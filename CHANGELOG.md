@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.19
+
+- Add `.pre-commit-config.yaml` with local hooks mirroring CI (biome, tsc, bun test) so formatting and type errors are caught before push
+
 ## v0.1.18
 
 - `safe-bash` heredoc commands (`<< 'EOF'` … `EOF`, any delimiter) are now treated as a single segment instead of being split line-by-line, so multiline heredocs no longer trigger a separate approval prompt per line
