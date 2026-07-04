@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import {
+	isCompoundCommand,
 	isPureAssignment,
 	isValidPattern,
 	matchesAllowlistEntry,
@@ -14,6 +15,109 @@ import {
 
 const CWD = "/Users/me/code/proj";
 const HOME = "/Users/me";
+
+// isCompoundCommand
+
+test("isCompoundCommand: for loop (inline)", () => {
+	expect(isCompoundCommand('for f in *.txt; do echo "$f"; done')).toBe(true);
+});
+
+test("isCompoundCommand: for loop (multiline)", () => {
+	expect(isCompoundCommand('for f in *.txt\ndo\n  echo "$f"\ndone')).toBe(true);
+});
+
+test("isCompoundCommand: if statement", () => {
+	expect(isCompoundCommand("if [ -f file ]; then echo ok; fi")).toBe(true);
+});
+
+test("isCompoundCommand: while loop", () => {
+	expect(isCompoundCommand('while read line; do echo "$line"; done')).toBe(
+		true,
+	);
+});
+
+test("isCompoundCommand: until loop", () => {
+	expect(isCompoundCommand("until false; do echo waiting; done")).toBe(true);
+});
+
+test("isCompoundCommand: case statement", () => {
+	expect(isCompoundCommand('case "$var" in foo) echo match;; esac')).toBe(true);
+});
+
+test("isCompoundCommand: function keyword", () => {
+	expect(isCompoundCommand("function greet() { echo hi; }")).toBe(true);
+});
+
+test("isCompoundCommand: compound keyword after && is detected", () => {
+	expect(
+		isCompoundCommand('echo start && for f in *; do echo "$f"; done'),
+	).toBe(true);
+});
+
+test("isCompoundCommand: compound keyword after pipe is detected", () => {
+	expect(
+		isCompoundCommand('cat list.txt | while read f; do rm "$f"; done'),
+	).toBe(true);
+});
+
+test("isCompoundCommand: simple commands are not compound", () => {
+	expect(isCompoundCommand("echo hello")).toBe(false);
+	expect(isCompoundCommand("git status")).toBe(false);
+	expect(isCompoundCommand("ls -la && git diff")).toBe(false);
+	expect(isCompoundCommand("echo foo; ls")).toBe(false);
+});
+
+test("isCompoundCommand: keyword as argument is not compound", () => {
+	// 'for' is after 'echo', not the first word of a sub-command
+	expect(isCompoundCommand("echo for sale")).toBe(false);
+	expect(isCompoundCommand("grep if file.txt")).toBe(false);
+});
+
+test("isCompoundCommand: keyword inside quotes is not compound", () => {
+	expect(isCompoundCommand('echo "for sale" && ls')).toBe(false);
+	expect(isCompoundCommand("echo 'while true'")).toBe(false);
+});
+
+test("isCompoundCommand: keyword-like variable name is not compound", () => {
+	// 'informating' starts with 'if' but is a different identifier
+	expect(isCompoundCommand("inform=value")).toBe(false);
+	expect(isCompoundCommand("foreach=1")).toBe(false); // not 'for'
+});
+
+// splitSegments — compound command handling
+
+test("splitSegments: for loop is returned as one segment", () => {
+	const cmd = 'for f in *.txt; do echo "$f"; done';
+	expect(splitSegments(cmd)).toEqual([cmd]);
+});
+
+test("splitSegments: multiline for loop is one segment", () => {
+	const cmd = 'for f in *.txt\ndo\n  echo "$f"\ndone';
+	expect(splitSegments(cmd)).toEqual([cmd]);
+});
+
+test("splitSegments: if statement is one segment", () => {
+	const cmd = "if [ -f file ]; then echo ok; fi";
+	expect(splitSegments(cmd)).toEqual([cmd]);
+});
+
+test("splitSegments: while loop is one segment", () => {
+	const cmd = 'while read line; do echo "$line"; done';
+	expect(splitSegments(cmd)).toEqual([cmd]);
+});
+
+test("splitSegments: compound after && is still one whole segment", () => {
+	const cmd = 'echo start && for f in *; do echo "$f"; done && echo end';
+	expect(splitSegments(cmd)).toEqual([cmd.trim()]);
+});
+
+test("splitSegments: plain && chain still splits into segments", () => {
+	expect(splitSegments("echo hello && ls")).toEqual(["echo hello", "ls"]);
+});
+
+test("splitSegments: semicolon chain without compound keywords still splits", () => {
+	expect(splitSegments("echo foo; ls")).toEqual(["echo foo", "ls"]);
+});
 
 // isPureAssignment
 

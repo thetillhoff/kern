@@ -269,14 +269,125 @@ function scanHeredoc(
 	return { end: i, text };
 }
 
+// Shell keywords that open compound commands. When any of these appears as the
+// first word of a (sub-)command (outside quotes), the whole command must be
+// reviewed in one go. Splitting it on `&&` / `||` / `;` / `|` / newlines would
+// produce meaningless fragments (`do`, `done`, `then`, `fi`, etc.) that cannot
+// be individually understood or safely allowlist-matched.
+const COMPOUND_KEYWORDS = new Set([
+	"for",
+	"while",
+	"until",
+	"if",
+	"case",
+	"select",
+	"function",
+]);
+
+/**
+ * Returns true when `command` contains a compound-command opening keyword
+ * (`for`, `while`, `until`, `if`, `case`, `select`, `function`) as the first
+ * shell word of any (sub-)command (outside of quotes).
+ *
+ * Used by `splitSegments` to skip the normal segment-splitting logic: the
+ * whole command is returned as a single segment so the user reviews it as a
+ * unit, not as a stream of disjointed keyword fragments.
+ */
+export function isCompoundCommand(command: string): boolean {
+	let inSingle = false;
+	let inDouble = false;
+	// True while we are still looking for the first word of the current
+	// (sub-)command (i.e. at a "command position" — start of string or
+	// immediately after a shell separator).
+	let lookingForFirstWord = true;
+	let wordBuf = "";
+
+	for (let i = 0; i < command.length; i++) {
+		const ch = command[i];
+
+		if (inSingle) {
+			if (ch === "'") inSingle = false;
+			continue;
+		}
+		if (inDouble) {
+			if (ch === "\\" && i + 1 < command.length) i++;
+			else if (ch === '"') inDouble = false;
+			continue;
+		}
+
+		// unquoted territory
+		if (ch === "\\" && i + 1 < command.length) {
+			// backslash-escape: cannot be a bare keyword anymore
+			lookingForFirstWord = false;
+			wordBuf = "";
+			i++;
+			continue;
+		}
+		if (ch === "'") {
+			inSingle = true;
+			lookingForFirstWord = false;
+			wordBuf = "";
+			continue;
+		}
+		if (ch === '"') {
+			inDouble = true;
+			lookingForFirstWord = false;
+			wordBuf = "";
+			continue;
+		}
+
+		// two-char operators — check buffered word, then enter new command position
+		const two = command.slice(i, i + 2);
+		if (two === "&&" || two === "||") {
+			if (lookingForFirstWord && COMPOUND_KEYWORDS.has(wordBuf)) return true;
+			lookingForFirstWord = true;
+			wordBuf = "";
+			i++; // skip second char
+			continue;
+		}
+
+		// single-char separators
+		if (ch === "|" || ch === ";" || ch === "&" || ch === "\n" || ch === "\r") {
+			if (lookingForFirstWord && COMPOUND_KEYWORDS.has(wordBuf)) return true;
+			lookingForFirstWord = true;
+			wordBuf = "";
+			continue;
+		}
+
+		// whitespace: finishes the current word
+		if (ch === " " || ch === "\t") {
+			if (lookingForFirstWord && wordBuf.length > 0) {
+				if (COMPOUND_KEYWORDS.has(wordBuf)) return true;
+				lookingForFirstWord = false; // past the first word of this sub-command
+				wordBuf = "";
+			}
+			continue;
+		}
+
+		// regular character: accumulate only while looking for the first word
+		if (lookingForFirstWord) wordBuf += ch;
+	}
+
+	// check any word still buffered at end-of-string
+	return lookingForFirstWord && COMPOUND_KEYWORDS.has(wordBuf);
+}
+
 /**
  * Split a command into its individual sub-commands on shell separators
  * (`|`, `||`, `&&`, `;`). `||` is matched before `|` so it is one separator,
  * not two empty splits. Each sub-command is approved/blocked on its own, so
  * `rm -rf / && ls` cannot ride in on a whole-string pattern.
+ *
+ * Compound commands (`for`, `while`, `if`, etc.) are returned as a single
+ * segment — they must be reviewed as a whole, not as disconnected keyword
+ * fragments. See `isCompoundCommand`.
  */
 // Returns null when the command contains an unmatched quote — caller must block.
 export function splitSegments(command: string): string[] | null {
+	// Compound control-flow constructs must be presented to the user in one
+	// piece. Splitting them would produce individually-meaningless fragments
+	// (`do`, `done`, `then`, `fi`, etc.) and break the approval flow.
+	if (isCompoundCommand(command)) return [command.trim()];
 	const segments: string[] = [];
 	let current = "";
 	let inSingle = false;

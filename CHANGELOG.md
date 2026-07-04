@@ -2,7 +2,7 @@
 
 ## v0.1.21
 
-- `templates/PI.md` Shell section: generalize the `cd <path> && <command>` rule to all commands, not just git. Explains that flags like `git -C`, `make -C`, `npm --prefix` are disallowed because the approval system matches against command text and cannot see that the effective path differs from cwd. The git-specific duplicate bullet is removed.
+- `safe-bash` now detects compound shell commands (`for`, `while`, `until`, `if`, `case`, `select`, `function`) and presents them as a single approval prompt rather than splitting them into meaningless fragments (`do`, `done`, `then`, `fi`, etc.). Simple `&&` / `||` / `;` / `|` chains without control-flow keywords are still split into per-command prompts as before.
 
 ## v0.1.20
 
