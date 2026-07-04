@@ -5,11 +5,11 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { queuedSelect } from "../shared/permission-queue.ts";
 import { appendAllowlistPattern } from "./allowlist.ts";
 import {
+	isPureAssignment,
 	isValidPattern,
 	matchesAllowlistEntry,
 	matchesPattern,
 	normalizePaths,
-	isPureAssignment,
 	SUBST_RE,
 	splitSegments,
 	suggestPattern,

@@ -1,10 +1,10 @@
 import { expect, test } from "bun:test";
 import {
+	isPureAssignment,
 	isValidPattern,
 	matchesAllowlistEntry,
 	matchesPattern,
 	normalizePaths,
-	isPureAssignment,
 	parseConfined,
 	resolveAbs,
 	splitSegments,
@@ -45,7 +45,6 @@ test("isPureAssignment: empty and invalid identifier forms", () => {
 	expect(isPureAssignment("=value")).toBe(false); // no name
 	expect(isPureAssignment("1VAR=x")).toBe(false); // starts with digit
 });
-
 
 test("exact match", () => {
 	expect(matchesPattern("git status", "git status")).toBe(true);
