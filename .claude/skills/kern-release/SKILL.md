@@ -19,7 +19,7 @@ grep '"version"' package.json
 git tag --sort=-v:refname | head -1
 ```
 
-Edit `package.json` `"version"` to match the new tag (without the `v` prefix), commit, and push:
+Edit `package.json` `"version"` to match the new tag (without the `v` prefix). Ensure `CHANGELOG.md` has a `## vX.Y.Z` heading (not `## Unreleased`) — `action-release-prerequisites` greps for the exact tag string. Commit and push:
 
 ```bash
 git add package.json
