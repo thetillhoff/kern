@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { queuedSelect } from "../shared/permission-queue.ts";
+import { queuedApproval } from "../shared/permission-queue.ts";
 import { appendAllowlistPattern } from "./allowlist.ts";
 import {
 	isPureAssignment,
@@ -106,10 +106,11 @@ export default function (pi: ExtensionAPI) {
 			)
 				continue; // pre-approved (or just allow-always'd)
 
-			const choice = await queuedSelect(
+			const { choice, note } = await queuedApproval(
 				ctx.ui,
 				`Bash approval required: ${seg.slice(0, 80)}`,
 				["Allow once", "Allow always…", "Deny"],
+				new Set(["Allow once", "Deny"]),
 			);
 			if (choice === "Allow always…") {
 				// Show the original command in the (read-only) editor title so the
@@ -141,13 +142,9 @@ export default function (pi: ExtensionAPI) {
 				continue;
 			}
 			if (choice === "Allow once") {
-				const comment = await ctx.ui.input(
-					"Note for the agent (optional)",
-					"e.g. please use git status instead next time",
-				);
-				if (comment?.trim()) {
+				if (note) {
 					const existing = pendingComments.get(event.toolCallId) ?? [];
-					existing.push(comment.trim());
+					existing.push(note);
 					pendingComments.set(event.toolCallId, existing);
 				}
 				decided.add(seg);
@@ -155,14 +152,8 @@ export default function (pi: ExtensionAPI) {
 			}
 			// "Deny" or undefined (user cancelled the select prompt)
 			let reason = `User denied: ${seg}`;
-			if (choice === "Deny") {
-				const comment = await ctx.ui.input(
-					"Reason for the agent (optional)",
-					"e.g. use git status instead",
-				);
-				if (comment?.trim()) {
-					reason = `User denied: ${seg} — ${comment.trim()}`;
-				}
+			if (choice === "Deny" && note) {
+				reason = `User denied: ${seg} — ${note}`;
 			}
 			return { block: true, reason };
 		}

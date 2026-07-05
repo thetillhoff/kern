@@ -226,6 +226,27 @@ test("splitSegments splits on newline and single & (each is a new command)", () 
 	expect(splitSegments("echo 'a&b'")).toEqual(["echo 'a&b'"]);
 });
 
+test("splitSegments: backslash+newline (line continuation) is discarded", () => {
+	// The AI sometimes writes: cmd1 && \
+	//   cmd2
+	// The \ + \n must be consumed and discarded so the second segment is
+	// "cmd2", not "\ cmd2".
+	expect(
+		splitSegments(
+			"kubectl wait --timeout=600s && \\\nkubectl logs -n ns job/j",
+		),
+	).toEqual(["kubectl wait --timeout=600s", "kubectl logs -n ns job/j"]);
+	// indented second line (trailing space after continuation)
+	expect(splitSegments("echo hello && \\\n  echo world")).toEqual([
+		"echo hello",
+		"echo world",
+	]);
+	// Windows CRLF continuation
+	expect(splitSegments("echo a && \\\r\necho b")).toEqual(["echo a", "echo b"]);
+	// plain backslash inside a word is still kept (not a continuation)
+	expect(splitSegments("echo foo\\bar")).toEqual(["echo foo\\bar"]);
+});
+
 test("splitSegments: >& fd redirect is not a separator (e.g. 2>&1)", () => {
 	expect(splitSegments("sqlc generate 2>&1")).toEqual(["sqlc generate 2>&1"]);
 	expect(splitSegments("cmd >&2")).toEqual(["cmd >&2"]);

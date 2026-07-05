@@ -413,8 +413,21 @@ export function splitSegments(command: string): string[] | null {
 		} else {
 			// unquoted
 			if (ch === "\\" && i + 1 < command.length) {
-				// backslash escapes next char — stays unquoted, does NOT open a string
-				current += ch + command[++i];
+				const next = command[i + 1];
+				if (next === "\n") {
+					// Unix line continuation (\+LF): discard both — shell joins the lines
+					i++;
+				} else if (
+					next === "\r" &&
+					i + 2 < command.length &&
+					command[i + 2] === "\n"
+				) {
+					// Windows line continuation (\+CRLF): discard all three
+					i += 2;
+				} else {
+					// backslash escapes next char — stays unquoted, does NOT open a string
+					current += ch + command[++i];
+				}
 			} else if (ch === "'") {
 				inSingle = true;
 				current += ch;
