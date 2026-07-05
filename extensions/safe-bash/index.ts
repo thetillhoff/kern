@@ -106,56 +106,58 @@ export default function (pi: ExtensionAPI) {
 			)
 				continue; // pre-approved (or just allow-always'd)
 
-			const { choice, note } = await queuedApproval(
-				ctx.ui,
-				`Bash approval required: ${seg.slice(0, 80)}`,
-				["Allow once", "Allow always…", "Deny"],
-				new Set(["Allow once", "Deny"]),
-			);
-			if (choice === "Allow always…") {
-				// Show the original command in the (read-only) editor title so the
-				// user can see what they are allowing while editing the pattern.
-				const edited = await ctx.ui.editor(
-					`Allowlist pattern for: ${seg}`,
-					suggestPattern(seg),
+			const promptMsg = `Bash approval required: ${seg}`;
+			// Loop so that cancelling the "Allow always…" editor returns to the select.
+			for (;;) {
+				const { choice, note } = await queuedApproval(
+					ctx.ui,
+					promptMsg,
+					["Allow once", "Allow always…", "Deny"],
+					new Set(["Allow once", "Deny"]),
 				);
-				const trimmed = edited?.trim() ?? "";
-				if (!trimmed) {
-					return { block: true, reason: "User cancelled allow-always" };
-				}
-				if (!isValidPattern(trimmed)) {
-					ctx.ui.notify(
-						"Pattern contains shell separators or substitution syntax — not saved",
-						"error",
+				if (choice === "Allow always…") {
+					// Show the original command in the (read-only) editor title so the
+					// user can see what they are allowing while editing the pattern.
+					const edited = await ctx.ui.editor(
+						`Allowlist pattern for: ${seg}`,
+						suggestPattern(seg),
 					);
-					return { block: true, reason: "Invalid allowlist pattern" };
+					const trimmed = edited?.trim() ?? "";
+					if (!trimmed) continue; // cancelled editor → back to select
+					if (!isValidPattern(trimmed)) {
+						ctx.ui.notify(
+							"Pattern contains shell separators or substitution syntax — not saved",
+							"error",
+						);
+						continue; // invalid pattern → back to select
+					}
+					const saved = appendAllowlistPattern(settingsPath, trimmed);
+					if (!saved) {
+						ctx.ui.notify(
+							"Could not persist pattern: settings.json is malformed — allowing for this session only",
+							"warning",
+						);
+					}
+					rules.allowlist.push(trimmed); // in-memory grant: persisted if saved, session-only if not
+					decided.add(seg);
+					break;
 				}
-				const saved = appendAllowlistPattern(settingsPath, trimmed);
-				if (!saved) {
-					ctx.ui.notify(
-						"Could not persist pattern: settings.json is malformed — allowing for this session only",
-						"warning",
-					);
+				if (choice === "Allow once") {
+					if (note) {
+						const existing = pendingComments.get(event.toolCallId) ?? [];
+						existing.push(note);
+						pendingComments.set(event.toolCallId, existing);
+					}
+					decided.add(seg);
+					break;
 				}
-				rules.allowlist.push(trimmed); // in-memory grant: persisted if saved, session-only if not
-				decided.add(seg);
-				continue;
-			}
-			if (choice === "Allow once") {
-				if (note) {
-					const existing = pendingComments.get(event.toolCallId) ?? [];
-					existing.push(note);
-					pendingComments.set(event.toolCallId, existing);
+				// "Deny" or undefined (user cancelled the select prompt)
+				let reason = `User denied: ${seg}`;
+				if (choice === "Deny" && note) {
+					reason = `User denied: ${seg} — ${note}`;
 				}
-				decided.add(seg);
-				continue;
+				return { block: true, reason };
 			}
-			// "Deny" or undefined (user cancelled the select prompt)
-			let reason = `User denied: ${seg}`;
-			if (choice === "Deny" && note) {
-				reason = `User denied: ${seg} — ${note}`;
-			}
-			return { block: true, reason };
 		}
 	});
 }

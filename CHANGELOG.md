@@ -1,8 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- `safe-bash` approval prompt title is now truncated to the terminal width inside the TUI render callback (using the authoritative `width` parameter), preventing a TUI crash when a long command pushed the rendered line past the terminal width
+- `safe-bash` "Allow always…" editor: cancelling (empty submit or Esc) now returns to the option select instead of blocking the command; an invalid pattern also loops back rather than blocking
+
 ## v0.1.22
 
-- `safe-bash` line-continuation (`&&\` + newline) is now handled correctly: the backslash+newline is discarded when splitting into approval segments, so the second command is shown cleanly (e.g. `kubectl logs …`) instead of with a leading `\ ` prefix. The raw command passed to the shell is unaffected.
+- `safe-bash` line-continuation (`&&\` + newline) is now handled correctly: the backslash+newline is discarded when splitting into approval segments, so the second command is shown cleanly (e.g. `kubectl logs …`) instead of with a leading `\` prefix. The raw command passed to the shell is unaffected.
 - `safe-bash` approval prompt redesigned: notes are now inline. Pressing Tab on "Allow once" or "Deny" transforms the option into `"Allow once, "` / `"Deny, "` and lets the user type a note directly on that line. Enter confirms with the note; Esc returns to the option list. The two-step select → separate input dialog is gone.
 
 ## v0.1.21
@@ -31,7 +36,7 @@
 
 ## v0.1.16
 
-- Fix `safe-bash` allow-always re-prompting: a trailing ` *` pattern (e.g. `ls *`, `git status *`) now also matches the bare command with no args, so a single grant covers both `ls` and `ls -la`. Previously the bare form never matched and kept prompting. `suggestPattern` now always emits `<cmd> *`
+- Fix `safe-bash` allow-always re-prompting: a trailing `*` pattern (e.g. `ls *`, `git status *`) now also matches the bare command with no args, so a single grant covers both `ls` and `ls -la`. Previously the bare form never matched and kept prompting. `suggestPattern` now always emits `<cmd> *`
 
 ## v0.1.15
 

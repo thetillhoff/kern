@@ -129,14 +129,15 @@ export async function queuedApproval(
 
 			return {
 				render(width: number): string[] {
+					const title = message.slice(0, width);
 					if (noteMode) {
 						const prefix = `${noteChoice}, `;
 						// Input renders one line; prepend the choice label as prefix.
 						const inputLine =
 							input.render(Math.max(1, width - prefix.length))[0] ?? "";
-						return [message, prefix + inputLine];
+						return [title, prefix + inputLine];
 					}
-					return [message, ...selectList.render(width)];
+					return [title, ...selectList.render(width)];
 				},
 				handleInput(data: string) {
 					if (noteMode) {
