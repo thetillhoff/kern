@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.1.22
 
 - `safe-bash` line-continuation (`&&\` + newline) is now handled correctly: the backslash+newline is discarded when splitting into approval segments, so the second command is shown cleanly (e.g. `kubectl logs …`) instead of with a leading `\ ` prefix. The raw command passed to the shell is unaffected.
 - `safe-bash` approval prompt redesigned: notes are now inline. Pressing Tab on "Allow once" or "Deny" transforms the option into `"Allow once, "` / `"Deny, "` and lets the user type a note directly on that line. Enter confirms with the note; Esc returns to the option list. The two-step select → separate input dialog is gone.
