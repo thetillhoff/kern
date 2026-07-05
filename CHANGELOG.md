@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.1.23
 
 - `safe-bash` approval prompt title is now truncated to the terminal width inside the TUI render callback (using the authoritative `width` parameter), preventing a TUI crash when a long command pushed the rendered line past the terminal width
 - `safe-bash` "Allow always…" editor: cancelling (empty submit or Esc) now returns to the option select instead of blocking the command; an invalid pattern also loops back rather than blocking
