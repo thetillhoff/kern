@@ -65,6 +65,13 @@ export function parseConfined(
  *      (glued forms like `-f/etc/shadow`) bails to a prompt — its shell path is
  *      the substring after the flag letters, which resolveAbs cannot recover, so
  *      cwd-joining it would falsely test as contained.
+ *   4. a part with no `/` and no leading `~` is a non-path token (flag value
+ *      like `-name README*` or `-type f`, or a bare word) — resolving it
+ *      cwd-relative fails containment when cwd is outside the base, so skip it.
+ *   5. a part matching a shell redirect spec (`2>/dev/null`, `>>log`, `>&2`,
+ *      `<in`) is not a file argument; skip it.
+ *   6. everything else is resolved to an absolute path and checked for
+ *      containment within `base`.
  *
  * ponytail: a symlink inside `base` that points outside it is not detected —
  * this is lexical-only (no filesystem access, no realpath), so such a link
@@ -104,6 +111,15 @@ export function withinBase(
 				if (part.includes("/")) return false; // 3. glued flag+path → prompt
 				continue; // pure flag
 			}
+			// Non-path tokens: a token without '/' or a leading '~' cannot be an
+			// absolute or home-relative path. Treating it as cwd-relative would
+			// falsely fail containment when cwd is outside the base — e.g. the
+			// value argument to -name/-type/-maxdepth ('README*', 'f', '2').
+			if (!part.includes("/") && !part.startsWith("~")) continue;
+			// Shell redirect specs (2>/dev/null, >>/tmp/out, >&2, <in): the part
+			// after the redirect operator is a descriptor or path unrelated to
+			// the command's file arguments.
+			if (/^[0-9]*>>?[&/]|^[0-9]*</.test(part)) continue;
 			const abs = resolveAbs(part, cwd, home);
 			if (abs !== absBase && !abs.startsWith(`${absBase}/`)) return false;
 		}

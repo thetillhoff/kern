@@ -648,6 +648,55 @@ test("withinBase: unexpanded shell variables fail safe", () => {
 	expect(within("cat --file=$SECRET", "cat", ".")).toBe(false);
 });
 
+// The next two test groups cover a bug where flag values and redirect specs were
+// treated as cwd-relative paths and failed containment whenever cwd was not
+// inside the base (e.g. base=/var/log, cwd=/Users/me/code/proj).
+// When cwd happened to be inside the base (e.g. base=~/code) the bug was masked
+// because the cwd-joined path still resolved within the base.
+
+test("withinBase: flag values (non-path tokens) do not fail containment", () => {
+	// -type f: 'f' is a value for -type, not a path
+	expect(within("find /var/log -type f", "find", "/var/log")).toBe(true);
+	// -name pattern: 'syslog*' is a glob passed to -name, not a path to check
+	expect(within("find /var/log -name 'syslog*'", "find", "/var/log")).toBe(
+		true,
+	);
+	// -maxdepth value: '2' is a number, not a path
+	expect(within("find /var/log -maxdepth 2", "find", "/var/log")).toBe(true);
+	// The originally reported case
+	expect(
+		within(
+			"find /opt/homebrew/Cellar/kern -name 'README*' 2>/dev/null",
+			"find",
+			"/opt/homebrew/Cellar",
+		),
+	).toBe(true);
+});
+
+test("withinBase: redirect specs are not path arguments", () => {
+	// Output redirect to an absolute path outside the base must not block the command.
+	// 2>/dev/null is a redirect spec, not a file argument.
+	expect(
+		within("find /var/log -name '*.log' 2>/dev/null", "find", "/var/log"),
+	).toBe(true);
+	// Append redirect
+	expect(within("find /var/log >>/tmp/out.log", "find", "/var/log")).toBe(true);
+	// fd redirect (>&2)
+	expect(within("find /var/log >&2", "find", "/var/log")).toBe(true);
+});
+
+test("withinBase: explicit out-of-tree path still blocked after flag-value fix", () => {
+	// A real path argument that escapes the base must still be caught.
+	expect(within("find /var/log /etc/passwd", "find", "/var/log")).toBe(false);
+	expect(
+		within(
+			"find /opt/homebrew/Cellar/../../../etc",
+			"find",
+			"/opt/homebrew/Cellar",
+		),
+	).toBe(false);
+});
+
 // matchesAllowlistEntry
 
 const allow = (cmd: string, pat: string) =>
@@ -657,6 +706,22 @@ test("matchesAllowlistEntry: confined entries use containment", () => {
 	expect(allow("cat README.md", "cat ./*")).toBe(true);
 	expect(allow("cat /etc/passwd", "cat ./*")).toBe(false);
 	expect(allow("find ~/code/foo", "find ~/code/*")).toBe(true);
+});
+
+test("matchesAllowlistEntry: find with -name and redirect matches confined pattern", () => {
+	// The originally reported case: find /opt/homebrew/Cellar/* should allow
+	// commands that use -name and redirect to /dev/null.
+	expect(
+		allow(
+			"find /opt/homebrew/Cellar/kern -name 'README*' 2>/dev/null",
+			"find /opt/homebrew/Cellar/*",
+		),
+	).toBe(true);
+	expect(
+		allow("find /var/log -name '*.log' -type f 2>/dev/null", "find /var/log/*"),
+	).toBe(true);
+	// An explicit path outside the base is still rejected.
+	expect(allow("find /var/log /etc/passwd", "find /var/log/*")).toBe(false);
 });
 
 test("matchesAllowlistEntry: non-confined entries fall back to glob", () => {
