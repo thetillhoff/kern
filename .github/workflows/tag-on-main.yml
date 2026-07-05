@@ -33,7 +33,7 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - name: Update CHANGELOG
+      - name: Update CHANGELOG and package.json
         env:
           NEW_VERSION: ${{ needs.determine-version.outputs.NEW_VERSION }}
           CURRENT_VERSION: ${{ needs.determine-version.outputs.CURRENT_VERSION }}
@@ -41,15 +41,17 @@ jobs:
           grep -q "^## ${CURRENT_VERSION}" CHANGELOG.md
           FIRST_VERSION_LINE_NUMBER=$(grep -n "^## ${CURRENT_VERSION}" CHANGELOG.md | head -1 | cut -d: -f1)
           sed -i "${FIRST_VERSION_LINE_NUMBER}i\## ${NEW_VERSION}\n\nUpdated dependencies.\n" CHANGELOG.md
+          PKG_VERSION="${NEW_VERSION#v}"
+          jq --arg v "$PKG_VERSION" '.version = $v' package.json > package.json.tmp && mv package.json.tmp package.json
 
-      - name: Commit and push CHANGELOG
+      - name: Commit and push CHANGELOG and package.json
         env:
           NEW_VERSION: ${{ needs.determine-version.outputs.NEW_VERSION }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add CHANGELOG.md
-          git commit -m "Add CHANGELOG entry for ${NEW_VERSION}"
+          git add CHANGELOG.md package.json
+          git commit -m "Add CHANGELOG entry and bump package.json for ${NEW_VERSION}"
           git push
 
   verify-build:

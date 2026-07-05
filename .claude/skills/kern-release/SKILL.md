@@ -9,6 +9,26 @@ Use when waiting for a kern release to complete after pushing a tag — monitors
 
 ## Steps
 
+### 0. Bump package.json and push
+
+Before tagging, ensure `package.json` version matches the intended tag — CI gates on this.
+
+```bash
+# Check current version and latest tag
+grep '"version"' package.json
+git tag --sort=-v:refname | head -1
+```
+
+Edit `package.json` `"version"` to match the new tag (without the `v` prefix), commit, and push:
+
+```bash
+git add package.json
+git commit -m "chore: release vX.Y.Z"
+git push origin main
+git tag vX.Y.Z
+git push origin vX.Y.Z
+```
+
 ### 1. Confirm tag pushed
 
 ```bash
