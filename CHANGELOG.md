@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.25
+
+Updated dependencies.
+
 ## v0.1.24
 
 - `safe-bash` confined allowlist entries (`<cmd> <base>/*`) no longer re-prompt when the command includes flag-value arguments (e.g. `-name README*`, `-type f`, `-maxdepth 2`) or redirect specs (e.g. `2>/dev/null`, `>>/tmp/out.log`). Previously these tokens were resolved as cwd-relative paths and failed the containment check whenever cwd was outside the base directory (e.g. `find /opt/homebrew/Cellar/kern -name 'README*' 2>/dev/null` against pattern `find /opt/homebrew/Cellar/*` always prompted). Path arguments that genuinely escape the base are still blocked.
