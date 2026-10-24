@@ -11,7 +11,7 @@
     "verify": "PI_PACKAGE_DIR=$(pwd)/dist dist/kern --version && PI_PACKAGE_DIR=$(pwd)/dist dist/kern --help 2>&1 | head -3"
   },
   "dependencies": {
-    "@earendil-works/pi-coding-agent": "0.79.8"
+    "@earendil-works/pi-coding-agent": "1.3.0"
   },
   "devDependencies": {
     "bun-types": "1.4.3",
